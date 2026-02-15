@@ -6,9 +6,9 @@
 - **Institution**: University of California, Irvine
 
 ### Team Members
-- Sterling Gip (Lead)
-- Lucas Jimenez-Suselo (lucasaj2)
-- Aditya Bakshi (bakshia2)
+- Sterling Gip 
+- Lucas Jimenez-Suselo 
+- Aditya Bakshi 
 
 ## Project Overview
 

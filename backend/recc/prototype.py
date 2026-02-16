@@ -28,11 +28,16 @@ class SmartShoppingAssistant:
         # - Stock: 0.0 (Empty) to 1.0 (Full)
         # - Last_Buy: Days ago
         self.user_inventory = {
-            "Cheese": {"stock": 0.1, "last_buy": 45},  # URGENT: Empty & Old
-            "Milk": {"stock": 0.9, "last_buy": 2},  # FINE: Full & New
-            "Eggs": {"stock": 0.4, "last_buy": 10},  # MEDIUM
-            "Snacks": {"stock": 0.2, "last_buy": 35},  # URGENT
-            "Fruit": {"stock": 0.8, "last_buy": 5},  # FINE
+            "Cheese": {"stock": 0.1, "last_buy": 45},  # Urgent
+            "Milk": {"stock": 0.9, "last_buy": 2},  # Fine
+            "Eggs": {"stock": 0.4, "last_buy": 10},  # Medium
+            "Snacks": {"stock": 0.2, "last_buy": 35},  # Urgent
+            "Fruit": {"stock": 0.8, "last_buy": 5},  # Fine
+            # NEW ITEM
+            "For the Love of Chocolate Mousse Cake": {
+                "stock": 0.0,  # Empty (You don't have it)
+                "last_buy": 365,  # Bought 1 year ago (Seasonal/Valentine's tradition)
+            },
         }
         print(f">>> User Profile Loaded: {self.user_inventory}")
 
@@ -107,9 +112,9 @@ if __name__ == "__main__":
 
     # 1. The "Wake Up" Scenario
     # The system checks a list of common staples to see what's needed.
-    print("\n>>> ANALYZING USER NEEDS (Cheese, Milk, Eggs, Snacks)...")
+    print("\n>>> ANALYZING USER NEEDS...")
 
-    daily_staples = ["Cheese", "Milk", "Eggs", "Snacks"]
+    daily_staples = assistant.user_inventory.keys()
     priorities = assistant.prioritize_needs(daily_staples)
 
     # 2. Display the Decision Process

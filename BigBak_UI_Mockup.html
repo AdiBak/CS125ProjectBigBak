@@ -1,0 +1,956 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Big Bak - UI Mockup</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #f5f7fa;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            text-align: center;
+            color: #2c3e50;
+            margin-bottom: 10px;
+            font-size: 32px;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #7f8c8d;
+            margin-bottom: 40px;
+            font-size: 16px;
+        }
+
+        .screens-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 30px;
+            margin-bottom: 40px;
+        }
+
+        .phone-frame {
+            background: white;
+            border-radius: 40px;
+            padding: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+            position: relative;
+            height: 700px;
+            overflow: hidden;
+        }
+
+        .phone-frame::before {
+            content: '';
+            position: absolute;
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 100px;
+            height: 20px;
+            background: #1a1a1a;
+            border-radius: 10px;
+            z-index: 10;
+        }
+
+        .screen-content {
+            background: #fff;
+            height: 100%;
+            overflow-y: auto;
+            padding-top: 30px;
+        }
+
+        .screen-header {
+            padding: 20px;
+            background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
+            color: white;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .screen-title {
+            font-size: 24px;
+            font-weight: 600;
+        }
+
+        .notification-badge {
+            width: 36px;
+            height: 36px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            position: relative;
+        }
+
+        .notification-badge::after {
+            content: '';
+            position: absolute;
+            top: 2px;
+            right: 2px;
+            width: 10px;
+            height: 10px;
+            background: #e74c3c;
+            border-radius: 50%;
+            border: 2px solid white;
+        }
+
+        .context-card {
+            margin: 20px;
+            padding: 16px;
+            background: linear-gradient(135deg, #f39c12 0%, #e67e22 100%);
+            border-radius: 12px;
+            color: white;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .context-icon {
+            font-size: 20px;
+        }
+
+        .recommendation-card {
+            margin: 20px;
+            background: white;
+            border: 1px solid #e0e0e0;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+
+        .urgency-banner {
+            padding: 8px 16px;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .urgency-high {
+            background: #fee;
+            color: #c0392b;
+        }
+
+        .urgency-medium {
+            background: #fef9e7;
+            color: #d68910;
+        }
+
+        .urgency-low {
+            background: #e8f8f5;
+            color: #16a085;
+        }
+
+        .card-content {
+            padding: 16px;
+        }
+
+        .product-header {
+            display: flex;
+            gap: 16px;
+            margin-bottom: 12px;
+        }
+
+        .product-image {
+            width: 80px;
+            height: 80px;
+            background: #ecf0f1;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 40px;
+            flex-shrink: 0;
+        }
+
+        .product-info {
+            flex: 1;
+        }
+
+        .product-name {
+            font-size: 16px;
+            font-weight: 600;
+            color: #2c3e50;
+            margin-bottom: 4px;
+        }
+
+        .product-price {
+            font-size: 18px;
+            color: #27ae60;
+            font-weight: 700;
+        }
+
+        .reason-box {
+            background: #f8f9fa;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 12px;
+            border-left: 4px solid #3498db;
+        }
+
+        .reason-label {
+            font-size: 11px;
+            color: #7f8c8d;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 4px;
+            font-weight: 600;
+        }
+
+        .reason-text {
+            font-size: 13px;
+            color: #34495e;
+        }
+
+        .store-info {
+            font-size: 13px;
+            color: #7f8c8d;
+            margin-bottom: 12px;
+        }
+
+        .card-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .btn {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background: #3498db;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #2980b9;
+        }
+
+        .btn-secondary {
+            background: #ecf0f1;
+            color: #7f8c8d;
+        }
+
+        .btn-secondary:hover {
+            background: #d5dbdb;
+        }
+
+        .bottom-nav {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: white;
+            border-top: 1px solid #e0e0e0;
+            display: flex;
+            justify-content: space-around;
+            padding: 12px 0;
+        }
+
+        .nav-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            color: #95a5a6;
+            font-size: 11px;
+            cursor: pointer;
+            transition: color 0.2s;
+        }
+
+        .nav-item.active {
+            color: #3498db;
+        }
+
+        .nav-icon {
+            font-size: 24px;
+        }
+
+        /* Inventory Screen Styles */
+        .search-bar {
+            margin: 20px;
+            position: relative;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 12px 16px 12px 44px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+
+        .search-icon {
+            position: absolute;
+            left: 16px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 18px;
+            color: #95a5a6;
+        }
+
+        .category-tabs {
+            display: flex;
+            gap: 8px;
+            padding: 0 20px 16px;
+            overflow-x: auto;
+        }
+
+        .tab {
+            padding: 8px 16px;
+            background: #ecf0f1;
+            border-radius: 20px;
+            font-size: 13px;
+            white-space: nowrap;
+            cursor: pointer;
+            color: #7f8c8d;
+            border: 1px solid transparent;
+        }
+
+        .tab.active {
+            background: #3498db;
+            color: white;
+        }
+
+        .inventory-item {
+            margin: 0 20px 16px;
+            padding: 16px;
+            background: white;
+            border: 1px solid #e0e0e0;
+            border-radius: 12px;
+            display: flex;
+            gap: 16px;
+            align-items: center;
+        }
+
+        .item-icon {
+            width: 50px;
+            height: 50px;
+            background: #ecf0f1;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+            flex-shrink: 0;
+        }
+
+        .item-details {
+            flex: 1;
+        }
+
+        .item-name {
+            font-size: 15px;
+            font-weight: 600;
+            color: #2c3e50;
+            margin-bottom: 4px;
+        }
+
+        .stock-bar-container {
+            height: 6px;
+            background: #ecf0f1;
+            border-radius: 3px;
+            overflow: hidden;
+            margin-bottom: 4px;
+        }
+
+        .stock-bar {
+            height: 100%;
+            border-radius: 3px;
+            transition: width 0.3s;
+        }
+
+        .stock-high {
+            background: #27ae60;
+        }
+
+        .stock-medium {
+            background: #f39c12;
+        }
+
+        .stock-low {
+            background: #e74c3c;
+        }
+
+        .last-buy {
+            font-size: 12px;
+            color: #95a5a6;
+        }
+
+        /* Settings Screen Styles */
+        .settings-section {
+            margin: 20px;
+        }
+
+        .section-title {
+            font-size: 13px;
+            font-weight: 600;
+            color: #7f8c8d;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 12px;
+        }
+
+        .settings-item {
+            background: white;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .settings-label {
+            font-size: 15px;
+            color: #2c3e50;
+        }
+
+        .settings-value {
+            font-size: 14px;
+            color: #7f8c8d;
+        }
+
+        .toggle {
+            width: 50px;
+            height: 28px;
+            background: #bdc3c7;
+            border-radius: 14px;
+            position: relative;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        .toggle.active {
+            background: #27ae60;
+        }
+
+        .toggle::after {
+            content: '';
+            position: absolute;
+            width: 24px;
+            height: 24px;
+            background: white;
+            border-radius: 50%;
+            top: 2px;
+            left: 2px;
+            transition: left 0.3s;
+        }
+
+        .toggle.active::after {
+            left: 24px;
+        }
+
+        /* Product Detail Screen */
+        .product-detail-image {
+            width: 100%;
+            height: 250px;
+            background: linear-gradient(135deg, #ecf0f1 0%, #d5dbdb 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 100px;
+        }
+
+        .detail-section {
+            padding: 20px;
+        }
+
+        .detail-product-name {
+            font-size: 24px;
+            font-weight: 700;
+            color: #2c3e50;
+            margin-bottom: 8px;
+        }
+
+        .detail-price {
+            font-size: 28px;
+            color: #27ae60;
+            font-weight: 700;
+            margin-bottom: 20px;
+        }
+
+        .info-card {
+            background: #f8f9fa;
+            padding: 16px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+        }
+
+        .info-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: #2c3e50;
+            margin-bottom: 12px;
+        }
+
+        .metric-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+        }
+
+        .metric-label {
+            font-size: 13px;
+            color: #7f8c8d;
+        }
+
+        .metric-value {
+            font-size: 13px;
+            font-weight: 600;
+            color: #2c3e50;
+        }
+
+        .store-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .store-item {
+            background: white;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .store-name {
+            font-size: 14px;
+            font-weight: 600;
+            color: #2c3e50;
+        }
+
+        .store-distance {
+            font-size: 13px;
+            color: #3498db;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 12px;
+            padding: 20px;
+            position: sticky;
+            bottom: 0;
+            background: white;
+            border-top: 1px solid #e0e0e0;
+        }
+
+        @media (max-width: 768px) {
+            .screens-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Big Bak - UI Mockup</h1>
+        <p class="subtitle">Personal Item Recommendation System for Young Adults</p>
+
+        <div class="screens-grid">
+            <!-- Screen 1: Home/Dashboard -->
+            <div class="phone-frame">
+                <div class="screen-content">
+                    <div class="screen-header">
+                        <div class="screen-title">Big Bak</div>
+                        <div class="notification-badge">🔔</div>
+                    </div>
+
+                    <div class="context-card">
+                        <span class="context-icon">📍</span>
+                        <div>Near Trader Joe's • After workout</div>
+                    </div>
+
+                    <!-- Recommendation Card 1 - High Urgency -->
+                    <div class="recommendation-card">
+                        <div class="urgency-banner urgency-high">High Priority</div>
+                        <div class="card-content">
+                            <div class="product-header">
+                                <div class="product-image">🧀</div>
+                                <div class="product-info">
+                                    <div class="product-name">Unexpected Cheddar Cheese</div>
+                                    <div class="product-price">$4.99</div>
+                                </div>
+                            </div>
+                            <div class="reason-box">
+                                <div class="reason-label">Why Now?</div>
+                                <div class="reason-text">Stock: 10% remaining • Last purchased 45 days ago</div>
+                            </div>
+                            <div class="store-info">📍 Trader Joe's - 0.2 mi away</div>
+                            <div class="card-actions">
+                                <button class="btn btn-primary">Add to Inventory</button>
+                                <button class="btn btn-secondary">Dismiss</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Recommendation Card 2 - High Urgency -->
+                    <div class="recommendation-card">
+                        <div class="urgency-banner urgency-high">High Priority</div>
+                        <div class="card-content">
+                            <div class="product-header">
+                                <div class="product-image">🍿</div>
+                                <div class="product-info">
+                                    <div class="product-name">Movie Theater Popcorn</div>
+                                    <div class="product-price">$2.99</div>
+                                </div>
+                            </div>
+                            <div class="reason-box">
+                                <div class="reason-label">Why Now?</div>
+                                <div class="reason-text">Stock: 20% remaining • Last purchased 35 days ago</div>
+                            </div>
+                            <div class="store-info">📍 Trader Joe's - 0.2 mi away</div>
+                            <div class="card-actions">
+                                <button class="btn btn-primary">Add to Inventory</button>
+                                <button class="btn btn-secondary">Dismiss</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Recommendation Card 3 - Medium Urgency -->
+                    <div class="recommendation-card">
+                        <div class="urgency-banner urgency-medium">Medium Priority</div>
+                        <div class="card-content">
+                            <div class="product-header">
+                                <div class="product-image">🥚</div>
+                                <div class="product-info">
+                                    <div class="product-name">Organic Free Range Eggs</div>
+                                    <div class="product-price">$5.49</div>
+                                </div>
+                            </div>
+                            <div class="reason-box">
+                                <div class="reason-label">Why Now?</div>
+                                <div class="reason-text">Stock: 40% remaining • Last purchased 10 days ago</div>
+                            </div>
+                            <div class="store-info">📍 Trader Joe's - 0.2 mi away</div>
+                            <div class="card-actions">
+                                <button class="btn btn-primary">Add to Inventory</button>
+                                <button class="btn btn-secondary">Dismiss</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div style="height: 80px;"></div>
+
+                    <div class="bottom-nav">
+                        <div class="nav-item active">
+                            <div class="nav-icon">🏠</div>
+                            <div>Home</div>
+                        </div>
+                        <div class="nav-item">
+                            <div class="nav-icon">📦</div>
+                            <div>Inventory</div>
+                        </div>
+                        <div class="nav-item">
+                            <div class="nav-icon">⚙️</div>
+                            <div>Settings</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Screen 2: Inventory Management -->
+            <div class="phone-frame">
+                <div class="screen-content">
+                    <div class="screen-header">
+                        <div class="screen-title">My Inventory</div>
+                        <div style="font-size: 20px;">➕</div>
+                    </div>
+
+                    <div class="search-bar">
+                        <span class="search-icon">🔍</span>
+                        <input type="text" class="search-input" placeholder="Search items...">
+                    </div>
+
+                    <div class="category-tabs">
+                        <div class="tab active">All</div>
+                        <div class="tab">Food</div>
+                        <div class="tab">Beverages</div>
+                        <div class="tab">Snacks</div>
+                        <div class="tab">Cheese</div>
+                    </div>
+
+                    <div class="inventory-item">
+                        <div class="item-icon">🧀</div>
+                        <div class="item-details">
+                            <div class="item-name">Cheese</div>
+                            <div class="stock-bar-container">
+                                <div class="stock-bar stock-low" style="width: 10%;"></div>
+                            </div>
+                            <div class="last-buy">Last bought 45 days ago</div>
+                        </div>
+                        <button class="btn btn-primary" style="padding: 8px 16px; font-size: 12px;">Restock</button>
+                    </div>
+
+                    <div class="inventory-item">
+                        <div class="item-icon">🥛</div>
+                        <div class="item-details">
+                            <div class="item-name">Milk</div>
+                            <div class="stock-bar-container">
+                                <div class="stock-bar stock-high" style="width: 90%;"></div>
+                            </div>
+                            <div class="last-buy">Last bought 2 days ago</div>
+                        </div>
+                        <button class="btn btn-secondary" style="padding: 8px 16px; font-size: 12px;">✓</button>
+                    </div>
+
+                    <div class="inventory-item">
+                        <div class="item-icon">🥚</div>
+                        <div class="item-details">
+                            <div class="item-name">Eggs</div>
+                            <div class="stock-bar-container">
+                                <div class="stock-bar stock-medium" style="width: 40%;"></div>
+                            </div>
+                            <div class="last-buy">Last bought 10 days ago</div>
+                        </div>
+                        <button class="btn btn-primary" style="padding: 8px 16px; font-size: 12px;">Restock</button>
+                    </div>
+
+                    <div class="inventory-item">
+                        <div class="item-icon">🍿</div>
+                        <div class="item-details">
+                            <div class="item-name">Snacks</div>
+                            <div class="stock-bar-container">
+                                <div class="stock-bar stock-low" style="width: 20%;"></div>
+                            </div>
+                            <div class="last-buy">Last bought 35 days ago</div>
+                        </div>
+                        <button class="btn btn-primary" style="padding: 8px 16px; font-size: 12px;">Restock</button>
+                    </div>
+
+                    <div class="inventory-item">
+                        <div class="item-icon">🍎</div>
+                        <div class="item-details">
+                            <div class="item-name">Fruit</div>
+                            <div class="stock-bar-container">
+                                <div class="stock-bar stock-high" style="width: 80%;"></div>
+                            </div>
+                            <div class="last-buy">Last bought 5 days ago</div>
+                        </div>
+                        <button class="btn btn-secondary" style="padding: 8px 16px; font-size: 12px;">✓</button>
+                    </div>
+
+                    <div style="height: 80px;"></div>
+
+                    <div class="bottom-nav">
+                        <div class="nav-item">
+                            <div class="nav-icon">🏠</div>
+                            <div>Home</div>
+                        </div>
+                        <div class="nav-item active">
+                            <div class="nav-icon">📦</div>
+                            <div>Inventory</div>
+                        </div>
+                        <div class="nav-item">
+                            <div class="nav-icon">⚙️</div>
+                            <div>Settings</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Screen 3: Product Detail -->
+            <div class="phone-frame">
+                <div class="screen-content">
+                    <div class="product-detail-image">🧀</div>
+
+                    <div class="detail-section">
+                        <div class="detail-product-name">Unexpected Cheddar Cheese</div>
+                        <div class="detail-price">$4.99</div>
+
+                        <div class="info-card">
+                            <div class="info-title">📊 Why Recommended</div>
+                            <div class="metric-row">
+                                <div class="metric-label">Urgency Score</div>
+                                <div class="metric-value" style="color: #e74c3c;">0.73 (High)</div>
+                            </div>
+                            <div class="metric-row">
+                                <div class="metric-label">Current Stock</div>
+                                <div class="metric-value">10%</div>
+                            </div>
+                            <div class="metric-row">
+                                <div class="metric-label">Last Purchase</div>
+                                <div class="metric-value">45 days ago</div>
+                            </div>
+                            <div class="metric-row">
+                                <div class="metric-label">Match Score</div>
+                                <div class="metric-value">0.92</div>
+                            </div>
+                        </div>
+
+                        <div class="info-card">
+                            <div class="info-title">📍 Nearby Stores</div>
+                            <div class="store-list">
+                                <div class="store-item">
+                                    <div>
+                                        <div class="store-name">Trader Joe's</div>
+                                        <div style="font-size: 12px; color: #7f8c8d;">123 Main St, Irvine</div>
+                                    </div>
+                                    <div class="store-distance">0.2 mi</div>
+                                </div>
+                                <div class="store-item">
+                                    <div>
+                                        <div class="store-name">Trader Joe's</div>
+                                        <div style="font-size: 12px; color: #7f8c8d;">456 Campus Dr, Irvine</div>
+                                    </div>
+                                    <div class="store-distance">1.4 mi</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="info-card">
+                            <div class="info-title">💡 Similar Products</div>
+                            <div style="display: flex; gap: 12px; overflow-x: auto;">
+                                <div style="min-width: 100px; text-align: center;">
+                                    <div style="width: 100px; height: 100px; background: #ecf0f1; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 48px; margin-bottom: 8px;">🧀</div>
+                                    <div style="font-size: 12px; color: #2c3e50; font-weight: 600;">Gouda</div>
+                                    <div style="font-size: 12px; color: #27ae60;">$5.99</div>
+                                </div>
+                                <div style="min-width: 100px; text-align: center;">
+                                    <div style="width: 100px; height: 100px; background: #ecf0f1; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 48px; margin-bottom: 8px;">🧀</div>
+                                    <div style="font-size: 12px; color: #2c3e50; font-weight: 600;">Brie</div>
+                                    <div style="font-size: 12px; color: #27ae60;">$6.49</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="action-buttons">
+                        <button class="btn btn-secondary" style="flex: 0 0 auto; padding: 12px 20px;">❤️</button>
+                        <button class="btn btn-primary">Add to Inventory</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Screen 4: Settings -->
+            <div class="phone-frame">
+                <div class="screen-content">
+                    <div class="screen-header">
+                        <div class="screen-title">Settings</div>
+                    </div>
+
+                    <div class="settings-section">
+                        <div class="section-title">User Profile</div>
+                        <div class="settings-item">
+                            <div class="settings-label">Name</div>
+                            <div class="settings-value">Alex Student →</div>
+                        </div>
+                        <div class="settings-item">
+                            <div class="settings-label">Email</div>
+                            <div class="settings-value"><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="e889848d90a89d8b81c68d8c9d">[email&#160;protected]</a> →</div>
+                        </div>
+                    </div>
+
+                    <div class="settings-section">
+                        <div class="section-title">Shopping Preferences</div>
+                        <div class="settings-item">
+                            <div class="settings-label">Preferred Brands</div>
+                            <div class="settings-value">Trader Joe's, 365 →</div>
+                        </div>
+                        <div class="settings-item">
+                            <div class="settings-label">Price Sensitivity</div>
+                            <div class="settings-value">Medium →</div>
+                        </div>
+                        <div class="settings-item">
+                            <div class="settings-label">Dietary Restrictions</div>
+                            <div class="settings-value">None →</div>
+                        </div>
+                        <div class="settings-item">
+                            <div class="settings-label">Shopping Method</div>
+                            <div class="settings-value">In-person →</div>
+                        </div>
+                    </div>
+
+                    <div class="settings-section">
+                        <div class="section-title">Notifications</div>
+                        <div class="settings-item">
+                            <div class="settings-label">Location-based alerts</div>
+                            <div class="toggle active"></div>
+                        </div>
+                        <div class="settings-item">
+                            <div class="settings-label">Low stock warnings</div>
+                            <div class="toggle active"></div>
+                        </div>
+                        <div class="settings-item">
+                            <div class="settings-label">Weekly summaries</div>
+                            <div class="toggle"></div>
+                        </div>
+                    </div>
+
+                    <div class="settings-section">
+                        <div class="section-title">Privacy</div>
+                        <div class="settings-item">
+                            <div class="settings-label">Location Services</div>
+                            <div class="toggle active"></div>
+                        </div>
+                        <div class="settings-item">
+                            <div class="settings-label">Usage Analytics</div>
+                            <div class="toggle active"></div>
+                        </div>
+                    </div>
+
+                    <div class="settings-section">
+                        <div class="section-title">Connected Stores</div>
+                        <div class="settings-item">
+                            <div class="settings-label">Trader Joe's</div>
+                            <div class="settings-value">✓ Connected</div>
+                        </div>
+                        <div class="settings-item">
+                            <div class="settings-label">Whole Foods</div>
+                            <div class="settings-value">Connect →</div>
+                        </div>
+                    </div>
+
+                    <div style="height: 80px;"></div>
+
+                    <div class="bottom-nav">
+                        <div class="nav-item">
+                            <div class="nav-icon">🏠</div>
+                            <div>Home</div>
+                        </div>
+                        <div class="nav-item">
+                            <div class="nav-icon">📦</div>
+                            <div>Inventory</div>
+                        </div>
+                        <div class="nav-item active">
+                            <div class="nav-icon">⚙️</div>
+                            <div>Settings</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div style="text-align: center; color: #7f8c8d; padding: 40px 0 20px;">
+            <p style="margin-bottom: 8px;"><strong>Big Bak</strong> - CS 125 Progress Report</p>
+            <p style="font-size: 14px;">Team: Sterling Gip, Lucas Jimenez-Suselo, Aditya Bakshi</p>
+            <p style="font-size: 14px; 

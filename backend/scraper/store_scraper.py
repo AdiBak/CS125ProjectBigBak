@@ -10,7 +10,8 @@ from webdriver_manager.chrome import ChromeDriverManager
 # --- CONFIGURATION ---
 DB_NAME = "bigbak.db"
 MAX_ITEMS_PER_CAT = 50  # UPDATED: Set to 50 (or 100+) to crawl more
-DELAY_BETWEEN_CATS = 3
+DELAY_BETWEEN_CATS = 5
+DELAY_BETWEEN_PAGES = 4
 
 CATEGORIES_TO_SCRAPE = [
     {"name": "Food", "url": "https://www.traderjoes.com/home/products/category/food-8"},
@@ -152,7 +153,7 @@ def scrape_category_products(driver, category_name, category_url):
                 print("    >>> Clicking Next Page...")
 
                 # Wait for new items to load
-                time.sleep(4)
+                time.sleep(4 + DELAY_BETWEEN_PAGES)
                 page_num += 1
 
             except Exception:

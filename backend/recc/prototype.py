@@ -1,6 +1,5 @@
 import sqlite3
 
-import numpy as np
 import pandas as pd
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import linear_kernel
@@ -8,13 +7,16 @@ from sklearn.metrics.pairwise import linear_kernel
 
 class SmartShoppingAssistant:
     def __init__(self, db_path="bigbak.db"):
+        self.db_path = db_path
+
         # 1. LOAD PRODUCT CATALOG (The Store)
         try:
-            conn = sqlite3.connect(db_path)
+            conn = sqlite3.connect(self.db_path)
             self.df = pd.read_sql_query("SELECT * FROM products", conn)
             conn.close()
             self.df["name"] = self.df["name"].fillna("")
-        except:
+        except Exception as e:
+            print(f"Warning: Could not load products. {e}")
             self.df = pd.DataFrame(columns=["name", "price", "category"])
 
         # 2. TRAIN TEXT ENGINE (For Product Matching)
@@ -22,46 +24,61 @@ class SmartShoppingAssistant:
         if not self.df.empty:
             self.tfidf_matrix = self.tfidf.fit_transform(self.df["name"])
 
-        # 3. SIMULATE USER INVENTORY (The "Personal Model")
-        # Instead of random numbers per product, we track CATEGORIES/TERMS.
-        # Logic:
-        # - Stock: 0.0 (Empty) to 1.0 (Full)
-        # - Last_Buy: Days ago
-        self.user_inventory = {
-            "Cheese": {"stock": 0.1, "last_buy": 45},  # Urgent
-            "Milk": {"stock": 0.9, "last_buy": 2},  # Fine
-            "Eggs": {"stock": 0.4, "last_buy": 10},  # Medium
-            "Snacks": {"stock": 0.2, "last_buy": 35},  # Urgent
-            "Fruit": {"stock": 0.8, "last_buy": 5},  # Fine
-            # NEW ITEM
-            "For the Love of Chocolate Mousse Cake": {
-                "stock": 0.0,  # Empty (You don't have it)
-                "last_buy": 365,  # Bought 1 year ago (Seasonal/Valentine's tradition)
-            },
-        }
-        print(f">>> User Profile Loaded: {self.user_inventory}")
+    def get_user_inventory(self, user_id: str) -> dict:
+        """
+        Fetches the inventory for a specific user from the database.
+        Assumes an 'inventory' table exists with columns: user_id, item_name, stock, last_buy
+        """
+        try:
+            conn = sqlite3.connect(self.db_path)
+            query = "SELECT item_name, stock, last_buy FROM inventory WHERE user_id = ?"
+            df_inv = pd.read_sql_query(query, conn, params=(user_id,))
+            conn.close()
 
-    def prioritize_needs(self, potential_needs):
+            user_inventory = {}
+            for _, row in df_inv.iterrows():
+                user_inventory[row["item_name"]] = {
+                    "stock": float(row["stock"]),
+                    "last_buy": int(row["last_buy"]),
+                }
+            return user_inventory
+
+        except Exception as e:
+            print(
+                f"Database error or missing inventory table: {e}. Using fallback mock data."
+            )
+            # Fallback mock data if the table doesn't exist yet so the app doesn't break
+            return {
+                "Cheese": {"stock": 0.1, "last_buy": 45},
+                "Milk": {"stock": 0.9, "last_buy": 2},
+                "For the Love of Chocolate Mousse Cake": {
+                    "stock": 0.0,
+                    "last_buy": 365,
+                },
+            }
+
+    def prioritize_needs(self, user_id: str, potential_needs: list = None):
         """
-        Step 1: Rank the 'Queries' based on User Urgency.
-        Input: ['Cheese', 'Milk', 'Eggs']
-        Output: Sorted list with scores.
+        Step 1: Rank the 'Queries' based on a specific User's Urgency.
         """
+        # Fetch dynamic inventory for this user
+        user_inventory = self.get_user_inventory(user_id)
+
+        # If no specific list is passed in, check everything in the user's inventory
+        if potential_needs is None:
+            potential_needs = list(user_inventory.keys())
+
         ranked_needs = []
 
         for item in potential_needs:
-            # Look up user data (Default to 'Unknown' if not in inventory)
-            data = self.user_inventory.get(item, {"stock": 0.5, "last_buy": 15})
+            # Look up user data (Default to 'Unknown' stock logic if item isn't tracked)
+            data = user_inventory.get(item, {"stock": 0.5, "last_buy": 15})
 
             # SCORING LOGIC (0.0 to 1.0)
-            # A. Stock Urgency (Lower stock = Higher score)
             score_stock = 1.0 - data["stock"]
-
-            # B. Recency Urgency (Older buy = Higher score)
-            # Cap at 30 days for max urgency
-            score_time = min(data["last_buy"] / 30.0, 1.0)
-
-            # C. Weighted Average (70% Stock, 30% Time)
+            score_time = min(
+                data["last_buy"] / 30.0, 1.0
+            )  # Cap at 30 days for max urgency
             final_urgency = (score_stock * 0.7) + (score_time * 0.3)
 
             ranked_needs.append(
@@ -72,27 +89,22 @@ class SmartShoppingAssistant:
                 }
             )
 
-        # Sort by urgency (descending)
         return sorted(ranked_needs, key=lambda x: x["urgency_score"], reverse=True)
 
     def get_products_for_need(self, query, top_n=3):
         """
         Step 2: Find the best products for the selected query.
-        Pure Text Similarity (Relevance).
         """
         if self.df.empty:
             return []
 
         query_vec = self.tfidf.transform([query])
         cosine_sim = linear_kernel(query_vec, self.tfidf_matrix).flatten()
-
-        # Get top indices
         top_indices = cosine_sim.argsort()[::-1][:top_n]
 
         results = []
         for i in top_indices:
-            # Threshold to filter noise
-            if cosine_sim[i] < 0.1:
+            if cosine_sim[i] < 0.1:  # Threshold to filter noise
                 continue
 
             results.append(
@@ -109,31 +121,13 @@ class SmartShoppingAssistant:
 # --- DEMO SCENARIO ---
 if __name__ == "__main__":
     assistant = SmartShoppingAssistant()
+    test_user = "demo_user_123"
 
-    # 1. The "Wake Up" Scenario
-    # The system checks a list of common staples to see what's needed.
-    print("\n>>> ANALYZING USER NEEDS...")
+    print(f"\n>>> ANALYZING NEEDS FOR USER: {test_user}...")
+    priorities = assistant.prioritize_needs(test_user)
 
-    daily_staples = assistant.user_inventory.keys()
-    priorities = assistant.prioritize_needs(daily_staples)
-
-    # 2. Display the Decision Process
     print("\n--- PRIORITY QUEUE ---")
     for p in priorities:
         print(
             f"Item: {p['query']:<10} | Urgency: {p['urgency_score']:.2f} | Context: {p['reason']}"
         )
-
-    # 3. Action the Top Priority
-    top_pick = priorities[0]
-    print(f"\n>>> WINNER: '{top_pick['query']}' is the most urgent need.")
-    print(f">>> Fetching best products for '{top_pick['query']}'...")
-
-    products = assistant.get_products_for_need(top_pick["query"])
-
-    print("\n--- RECOMMENDED PRODUCTS TO BUY ---")
-    for prod in products:
-        print(f"Product: {prod['name']}")
-        print(f"Price:   {prod['price']}")
-        print(f"Match:   {prod['relevance']}")
-        print("-" * 30)

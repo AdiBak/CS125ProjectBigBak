@@ -1,60 +1,40 @@
-import time
-
 import requests
+
 
 
 class BusinessLocationService:
     """
-    Service to find nearby businesses (grocery stores, pharmacies, etc.)
+    Service to find nearby Trader Joe's locations
     using the Overpass API (OpenStreetMap).
     """
 
     OVERPASS_URL = "https://overpass-api.de/api/interpreter"
 
     def __init__(self):
-        # Default radius in meters
-        self.default_radius = 2000
-        # Map our internal categories to OpenStreetMap tags
-        self.category_map = {
-            "grocery": ["shop=supermarket", "shop=convenience", "shop=grocery"],
-            "pharmacy": ["amenity=pharmacy"],
-            "bakery": ["shop=bakery"],
-            "department_store": ["shop=department_store"],
-            "mall": ["shop=mall"],
-        }
+        # Default radius in meters (increased since specific stores are less dense)
+        self.default_radius = 10000
 
-    def get_nearby_businesses(self, lat, lon, radius=None, categories=None):
+    def get_nearby_businesses(self, lat, lon, radius=None):
         """
-        Finds businesses near a specific latitude and longitude.
+        Finds Trader Joe's near a specific latitude and longitude.
 
         Args:
             lat (float): Latitude
             lon (float): Longitude
-            radius (int): Search radius in meters (default 2000)
-            categories (list): List of internal category keys (e.g., ['grocery'])
+            radius (int): Search radius in meters (default 10000)
 
         Returns:
-            list: List of dictionaries containing business details
+            list: List of dictionaries containing store details
         """
         if radius is None:
             radius = self.default_radius
 
-        if categories is None:
-            categories = list(self.category_map.keys())
-
-        # Build the Overpass QL query
-        # We look for nodes and ways (areas) that match our tags
-        query_parts = []
-        for cat in categories:
-            tags = self.category_map.get(cat, [])
-            for tag in tags:
-                query_parts.append(f"node[{tag}](around:{radius},{lat},{lon});")
-                query_parts.append(f"way[{tag}](around:{radius},{lat},{lon});")
-
+        # Build the Overpass QL query specifically for Trader Joe's (case-insensitive)
         full_query = f"""
         [out:json][timeout:25];
         (
-            {" ".join(query_parts)}
+            node["name"~"Trader Joe's",i](around:{radius},{lat},{lon});
+            way["name"~"Trader Joe's",i](around:{radius},{lat},{lon});
         );
         out center;
         """
@@ -69,14 +49,14 @@ class BusinessLocationService:
             return self._parse_results(data.get("elements", []), lat, lon)
         except Exception as e:
             print(f"Error fetching data from Overpass: {e}. Using mock location data.")
-            # Fallback mock store so your app doesn't break during testing
+            # Fallback mock store
             return [
                 {
-                    "name": "Mock Trader Joe's (Fallback)",
+                    "name": "Trader Joe's (Mock)",
                     "type": "supermarket",
-                    "lat": lat + 0.005,  # Slightly offset from user
+                    "lat": lat + 0.005,
                     "lon": lon + 0.005,
-                    "address": "123 Mockingbird Lane",
+                    "address": "123 Mockingbird Lane, Irvine",
                     "osm_id": 999999999,
                 }
             ]
@@ -87,25 +67,16 @@ class BusinessLocationService:
         """
         results = []
         for element in elements:
-            # Overpass 'way' elements with 'out center' provide a 'center' lat/lon
-            # 'node' elements provide 'lat'/'lon' directly
             lat = element.get("lat") or element.get("center", {}).get("lat")
             lon = element.get("lon") or element.get("center", {}).get("lon")
 
             tags = element.get("tags", {})
-            name = tags.get("name", "Unknown Business")
-
-            # Determine the type based on tags
-            business_type = "store"
-            if "shop" in tags:
-                business_type = tags["shop"]
-            elif "amenity" in tags:
-                business_type = tags["amenity"]
+            name = tags.get("name", "Trader Joe's")
 
             results.append(
                 {
                     "name": name,
-                    "type": business_type,
+                    "type": "supermarket",
                     "lat": lat,
                     "lon": lon,
                     "address": self._format_address(tags),
@@ -133,15 +104,13 @@ if __name__ == "__main__":
     test_lon = -117.8443
 
     service = BusinessLocationService()
-    print(f"Searching for grocery stores near {test_lat}, {test_lon}...")
+    print(f"Searching for Trader Joe's near {test_lat}, {test_lon}...")
 
-    stores = service.get_nearby_businesses(
-        test_lat, test_lon, radius=3000, categories=["grocery"]
-    )
+    stores = service.get_nearby_businesses(test_lat, test_lon, radius=10000)
 
     print(f"Found {len(stores)} locations:")
-    for store in stores[:5]:  # Show first 5
-        print(f"- {store['name']} ({store['type']})")
+    for store in stores:
+        print(f"- {store['name']}")
         print(f"  Address: {store['address']}")
         print(f"  Coords: {store['lat']}, {store['lon']}")
         print("-" * 20)

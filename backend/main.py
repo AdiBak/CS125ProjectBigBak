@@ -3,10 +3,9 @@ from typing import List, Optional
 
 from fastapi import Depends, FastAPI, HTTPException, Path, Query
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse
 from location_service import BusinessLocationService
 from pydantic import BaseModel, Field
-
-# Import existing logic
 from recc.prototype import SmartShoppingAssistant
 
 # ==========================================
@@ -29,6 +28,7 @@ class RecommendationItem(BaseModel):
 
 class RecommendationResponse(BaseModel):
     user_id: str
+    context: str
     recommendations: List[RecommendationItem]
 
 
@@ -48,11 +48,20 @@ class NearbyBusinessesResponse(BaseModel):
     businesses: List[Business]
 
 
-class ContextualAlertResponse(BaseModel):
-    alert: bool
-    message: str
-    store: Optional[Business] = None
-    item: Optional[dict] = None
+class InventoryItem(BaseModel):
+    item_name: str
+    stock_percentage: float
+    last_bought_days_ago: int
+    category: str
+
+
+class UserSettings(BaseModel):
+    user_name: str
+    email: str
+    preferred_brands: List[str]
+    price_sensitivity: str
+    location_alerts: bool
+    low_stock_warnings: bool
 
 
 # ==========================================
@@ -65,7 +74,6 @@ app = FastAPI(
     description="Context-aware recommendation system for daily essentials.",
 )
 
-# Add CORS middleware if a frontend (like your UI mockup) needs to call this
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -74,7 +82,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Initialize services (In a real app, these might be injected via Depends)
 DB_PATH = os.path.join(os.path.dirname(__file__), "bigbak.db")
 assistant = SmartShoppingAssistant(db_path=DB_PATH)
 location_service = BusinessLocationService()
@@ -99,27 +106,34 @@ def health_check():
     return {"status": "healthy", "service": "Big Bak API"}
 
 
+# --- HOME / DASHBOARD ---
 @app.get(
-    "/api/v1/users/{user_id}/recommendations",
+    "/api/v1/users/{user_id}/home",
     response_model=RecommendationResponse,
-    tags=["Recommendations"],
+    tags=["Home/Dashboard"],
 )
-def get_user_recommendations(
+def get_home_dashboard(
     user_id: str = Path(..., description="The unique identifier of the user"),
+    lat: float = Query(None, description="Current latitude"),
+    lon: float = Query(None, description="Current longitude"),
     recc_engine: SmartShoppingAssistant = Depends(get_assistant),
+    loc_service: BusinessLocationService = Depends(get_location_service),
 ):
     """
-    Analyzes a specific user's inventory and returns a prioritized list of needed items,
-    along with product matches from the database.
+    Populates the main dashboard with contextual info and high-priority recommendations.
     """
-    try:
-        # In a real app, you would fetch the user's specific inventory from a DB here using user_id.
-        # For now, we use the engine's current state.
-        # NEW
-        priorities = recc_engine.prioritize_needs(user_id)
+    priorities = recc_engine.prioritize_needs(user_id)
 
-        results = []
-        for p in priorities:
+    context_str = "At home"
+    if lat and lon:
+        stores = loc_service.get_nearby_businesses(lat, lon, radius=2000)
+        if stores:
+            context_str = f"Near {stores[0]['name']}"
+
+    results = []
+    for p in priorities:
+        # Only show high/medium priority on home screen
+        if p["urgency_score"] > 0.4:
             products = recc_engine.get_products_for_need(p["query"])
             results.append(
                 RecommendationItem(
@@ -130,36 +144,65 @@ def get_user_recommendations(
                 )
             )
 
-        return RecommendationResponse(user_id=user_id, recommendations=results)
-
-    except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Failed to generate recommendations: {str(e)}"
-        )
+    return RecommendationResponse(
+        user_id=user_id, context=context_str, recommendations=results
+    )
 
 
+# --- INVENTORY ---
 @app.get(
-    "/api/v1/locations/nearby-businesses",
+    "/api/v1/users/{user_id}/inventory",
+    response_model=List[InventoryItem],
+    tags=["Inventory"],
+)
+def get_user_inventory(
+    user_id: str = Path(...),
+    recc_engine: SmartShoppingAssistant = Depends(get_assistant),
+):
+    """
+    Retrieves the user's current inventory.
+    """
+    inv_data = recc_engine.get_user_inventory(user_id)
+    result = []
+    for item_name, data in inv_data.items():
+        result.append(
+            InventoryItem(
+                item_name=item_name,
+                stock_percentage=data["stock"] * 100,
+                last_bought_days_ago=data["last_buy"],
+                category="General",  # You can extend the DB to track categories
+            )
+        )
+    return result
+
+
+@app.post("/api/v1/users/{user_id}/inventory/restock", tags=["Inventory"])
+def restock_inventory_item(user_id: str = Path(...), item_name: str = Query(...)):
+    """
+    Marks an item as restocked (100% stock, 0 days ago).
+    (Requires implementing the write logic in SmartShoppingAssistant or directly via sqlite3)
+    """
+    # Logic to update bigbak.db inventory table goes here
+    return {"status": "success", "message": f"{item_name} restocked for {user_id}."}
+
+
+# --- LOCATION SERVICES ---
+@app.get(
+    "/api/v1/locations/nearby-trader-joes",
     response_model=NearbyBusinessesResponse,
     tags=["Location Services"],
 )
-def get_nearby_businesses(
+def get_nearby_tj(
     lat: float = Query(..., description="Latitude of user"),
     lon: float = Query(..., description="Longitude of user"),
-    radius: int = Query(2000, ge=100, le=10000, description="Search radius in meters"),
-    categories: Optional[List[str]] = Query(
-        None, description="Categories to search (e.g., grocery, pharmacy)"
-    ),
+    radius: int = Query(5000, description="Search radius in meters"),
     loc_service: BusinessLocationService = Depends(get_location_service),
 ):
     """
-    Finds adjacent businesses based on user coordinates using the Overpass API.
+    Finds adjacent Trader Joe's stores based on user coordinates.
     """
     try:
-        businesses = loc_service.get_nearby_businesses(
-            lat=lat, lon=lon, radius=radius, categories=categories
-        )
-
+        businesses = loc_service.get_nearby_businesses(lat=lat, lon=lon, radius=radius)
         return NearbyBusinessesResponse(
             location={"lat": lat, "lon": lon},
             radius=radius,
@@ -172,54 +215,84 @@ def get_nearby_businesses(
         )
 
 
+# --- SETTINGS ---
 @app.get(
-    "/api/v1/users/{user_id}/alerts/contextual",
-    response_model=ContextualAlertResponse,
-    tags=["Alerts"],
+    "/api/v1/users/{user_id}/settings", response_model=UserSettings, tags=["Settings"]
 )
-def get_contextual_alert(
-    user_id: str = Path(..., description="The unique identifier of the user"),
-    lat: float = Query(..., description="Current latitude"),
-    lon: float = Query(..., description="Current longitude"),
-    urgency_threshold: float = Query(
-        0.6, description="Minimum urgency score to trigger an alert"
-    ),
-    recc_engine: SmartShoppingAssistant = Depends(get_assistant),
-    loc_service: BusinessLocationService = Depends(get_location_service),
-):
+def get_user_settings(user_id: str = Path(...)):
     """
-    Evaluates if a user is near a relevant store while having urgent inventory needs.
+    Mock endpoint to retrieve user settings.
     """
-    # 1. Fetch user inventory and filter by urgency threshold
-    # NEW: Just pass the user_id from the URL path directly to the engine!
-    priorities = recc_engine.prioritize_needs(user_id)
-    urgent_items = [p for p in priorities if p["urgency_score"] > urgency_threshold]
-
-    if not urgent_items:
-        return ContextualAlertResponse(alert=False, message="No urgent needs detected.")
-
-    # 2. Check for nearby grocery stores
-    try:
-        stores = loc_service.get_nearby_businesses(
-            lat, lon, radius=1000, categories=["grocery"]
-        )
-    except Exception as e:
-        raise HTTPException(status_code=502, detail="Failed to fetch nearby stores.")
-
-    if stores:
-        top_store = stores[0]
-        top_need = urgent_items[0]
-
-        return ContextualAlertResponse(
-            alert=True,
-            message=f"Hey! You're near {top_store['name']}. You are running low on {top_need['query']} ({top_need['reason']}).",
-            store=Business(**top_store),
-            item=top_need,
-        )
-
-    return ContextualAlertResponse(
-        alert=False, message="Urgent items found, but no stores nearby."
+    return UserSettings(
+        user_name="Alex Student",
+        email="alex@example.com",
+        preferred_brands=["Trader Joe's", "365"],
+        price_sensitivity="Medium",
+        location_alerts=True,
+        low_stock_warnings=True,
     )
+
+
+@app.get("/", response_class=HTMLResponse, include_in_schema=False)
+def get_index():
+    """
+    Root index page serving as a landing page for API documentation.
+    (include_in_schema=False hides this specific endpoint from the API docs)
+    """
+    html_content = """
+    <!DOCTYPE html>
+    <html>
+        <head>
+            <title>Big Bak API</title>
+            <style>
+                body {
+                    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+                    background-color: #f4f4f9;
+                    color: #333;
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                    height: 100vh;
+                    margin: 0;
+                }
+                .container {
+                    background: white;
+                    padding: 40px;
+                    border-radius: 10px;
+                    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+                    max-width: 500px;
+                    text-align: center;
+                }
+                h1 { margin-top: 0; color: #2c3e50; }
+                p { font-size: 16px; color: #555; margin-bottom: 30px; }
+                .btn {
+                    display: inline-block;
+                    margin: 10px;
+                    padding: 12px 24px;
+                    color: white;
+                    background-color: #007bff;
+                    text-decoration: none;
+                    border-radius: 5px;
+                    font-weight: bold;
+                    transition: background-color 0.2s;
+                }
+                .btn:hover { background-color: #0056b3; }
+                .btn-secondary { background-color: #6c757d; }
+                .btn-secondary:hover { background-color: #5a6268; }
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <h1>Big Bak API 🛒</h1>
+                <p>Welcome to the backend service for the Big Bak mobile app. The API provides context-aware recommendations and location services.</p>
+
+                <a href="/docs" class="btn">Swagger UI (Interactive Docs)</a>
+                <a href="/redoc" class="btn btn-secondary">ReDoc (Static Docs)</a>
+            </div>
+        </body>
+    </html>
+    """
+    return HTMLResponse(content=html_content, status_code=200)
 
 
 if __name__ == "__main__":

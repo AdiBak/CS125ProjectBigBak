@@ -59,22 +59,52 @@ Then:
 
 ---
 
-## 3. Point the app at your backend (important for real device)
+## 3. Point the app at your backend (using ngrok – recommended)
 
-On a **physical iPhone**, the device cannot use `localhost`; it must use your **Mac’s IP address**.
+On a **physical iPhone**, Expo Go cannot call `http://localhost:8000` directly. We tunnel your local backend over **HTTPS** using **ngrok**, and the app talks to that URL.
 
-1. Find your Mac’s IP (same Wi‑Fi as the phone):
-   - **System Settings → Network → Wi‑Fi → Details** (or run `ipconfig getifaddr en0` in Terminal).
-2. In `mobile/lib/api.ts`, set the base URL before running the app:
-   - Either change the default:
-     ```ts
-     export const API_BASE_URL = 'http://192.168.x.x:8000';  // your Mac’s IP
+Everyone on the team can follow these same steps on their own machine:
+
+1. **Start the backend** (from repo root, in one terminal):
+   ```bash
+   cd backend
+   python main.py
+   # serves http://0.0.0.0:8000
+   ```
+
+2. **Install and configure ngrok** (one-time):
+   - Go to [ngrok.com](https://ngrok.com), create a free account, and install ngrok.
+   - Authenticate once:
+     ```bash
+     ngrok config add-authtoken YOUR_TOKEN
      ```
-   - Or use an env var (create `mobile/.env`):
+
+3. **Start an HTTPS tunnel to your backend** (second terminal):
+   ```bash
+   ngrok http 8000
+   ```
+   You’ll see something like:
+   ```text
+   Forwarding  https://your-subdomain.ngrok-free.dev -> http://localhost:8000
+   ```
+
+4. **Tell the mobile app which backend to use**:
+   - In the `mobile` folder, create or edit `.env`:
+     ```bash
+     cd mobile
+     echo "EXPO_PUBLIC_API_URL=https://your-subdomain.ngrok-free.dev" > .env
      ```
-     EXPO_PUBLIC_API_URL=http://192.168.x.x:8000
-     ```
-3. Restart the Expo dev server after changing the URL (`Ctrl+C`, then `npm start` again).
+     Replace the URL with the **https** URL from the ngrok output.
+
+5. **Restart Expo and reload the app**:
+   - Stop the Expo dev server (`Ctrl+C` in the `mobile` terminal), then run `npm start` again.
+   - Reload the app in Expo Go on your iPhone (pull to refresh or shake → Reload).
+
+> **Simulator / web shortcut:** If you are testing only in the **iOS Simulator** or **web**, you can skip ngrok and instead set:
+> ```env
+> EXPO_PUBLIC_API_URL=http://localhost:8000
+> ```
+> while the backend is running locally.
 
 ---
 

@@ -169,11 +169,16 @@ If Safari on your iPhone can open your health check URL but the app still shows
 
 ---
 
-## 6. Next steps (from your progress report)
+## 6. What’s implemented now
 
-- **Wire actions**: “Add to Inventory” and “Dismiss” on Home; “Restock” on Inventory (backend already has `POST .../inventory/restock`).
-- **Product detail screen**: Add a stack screen or modal for product detail (urgency score, nearby stores, similar products) and navigate from a recommendation card.
-- **Categories**: Use real categories from the backend in the Inventory tabs.
-- **Location**: Pass device location (`expo-location`) into the home dashboard API for “Near Trader Joe’s” context.
-
-Once the backend is running and `API_BASE_URL` is set to your Mac’s IP, you can open the app in **Expo Go** on your iPhone and see live data from your API.
+- **Home**: Context-aware recommendation feed with:
+  - Urgency score and “Why now?” reason per item.
+  - Nearest Trader Joe’s name in the context bar and card footer (uses backend `location_service`).
+  - “Add to Inventory” (marks item as restocked in the DB) and “Dismiss” (hides locally).
+  - Product detail screen with urgency, reason, match score, nearby store, and similar products.
+- **Inventory**:
+  - List of items with stock bars and “last bought X days ago”.
+  - “Restock” button (sets stock to full and last_buy to 0 in the DB).
+  - ➕ Add item (with initial stock level presets: Low/Medium/Full).
+  - Tap an item to edit stock and days since last purchase (so you can make items reappear on Home).
+- **Settings**: Static UI wired to the existing `/settings` endpoint (mock data).

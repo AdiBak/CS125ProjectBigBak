@@ -1,5 +1,10 @@
 selenium==4.40.0
 webdriver_manager==4.0.2
-requests
 fastapi
-uvicorn
+uvicorn[standard]
+pydantic
+requests
+pandas
+scikit-learn
+pytest
+httpx

@@ -24,6 +24,12 @@ class RecommendationItem(BaseModel):
     urgency: float = Field(..., description="Urgency score from 0.0 to 1.0")
     reason: str
     suggested_products: List[ProductSuggestion]
+    nearest_store_name: Optional[str] = Field(
+        None, description="Name of the nearest Trader Joe's (if location available)"
+    )
+    nearest_store_address: Optional[str] = Field(
+        None, description="Address of the nearest Trader Joe's (if available)"
+    )
 
 
 class RecommendationResponse(BaseModel):
@@ -53,6 +59,12 @@ class InventoryItem(BaseModel):
     stock_percentage: float
     last_bought_days_ago: int
     category: str
+
+
+class InventoryUpdate(BaseModel):
+    item_name: str
+    stock: float = Field(..., ge=0.0, le=1.0, description="Stock level 0.0–1.0")
+    last_buy: int = Field(..., ge=0, description="Days since last purchase")
 
 
 class UserSettings(BaseModel):
@@ -125,10 +137,12 @@ def get_home_dashboard(
     priorities = recc_engine.prioritize_needs(user_id)
 
     context_str = "At home"
-    if lat and lon:
+    nearest_store = None
+    if lat is not None and lon is not None:
         stores = loc_service.get_nearby_businesses(lat, lon, radius=2000)
         if stores:
-            context_str = f"Near {stores[0]['name']}"
+            nearest_store = stores[0]
+            context_str = f"Near {nearest_store['name']}"
 
     results = []
     for p in priorities:
@@ -141,6 +155,8 @@ def get_home_dashboard(
                     urgency=round(p["urgency_score"], 2),
                     reason=p["reason"],
                     suggested_products=[ProductSuggestion(**prod) for prod in products],
+                    nearest_store_name=nearest_store["name"] if nearest_store else None,
+                    nearest_store_address=nearest_store["address"] if nearest_store else None,
                 )
             )
 
@@ -177,13 +193,37 @@ def get_user_inventory(
 
 
 @app.post("/api/v1/users/{user_id}/inventory/restock", tags=["Inventory"])
-def restock_inventory_item(user_id: str = Path(...), item_name: str = Query(...)):
+def restock_inventory_item(
+    user_id: str = Path(...),
+    item_name: str = Query(...),
+    recc_engine: SmartShoppingAssistant = Depends(get_assistant),
+):
     """
-    Marks an item as restocked (100% stock, 0 days ago).
-    (Requires implementing the write logic in SmartShoppingAssistant or directly via sqlite3)
+    Marks an item as restocked (100% stock, 0 days ago). Persists to the database.
     """
-    # Logic to update bigbak.db inventory table goes here
+    ok = recc_engine.restock_item(user_id, item_name)
+    if not ok:
+        raise HTTPException(status_code=500, detail="Failed to update inventory.")
     return {"status": "success", "message": f"{item_name} restocked for {user_id}."}
+
+
+@app.patch(
+    "/api/v1/users/{user_id}/inventory",
+    tags=["Inventory"],
+)
+def update_inventory_item(
+    user_id: str = Path(...),
+    body: InventoryUpdate = ...,
+    recc_engine: SmartShoppingAssistant = Depends(get_assistant),
+):
+    """
+    Set an item's stock (0.0–1.0) and days since last buy. Creates the item if it doesn't exist.
+    Use this to add items with custom level or to lower stock so they show on Home again.
+    """
+    ok = recc_engine.set_inventory_item(user_id, body.item_name, body.stock, body.last_buy)
+    if not ok:
+        raise HTTPException(status_code=500, detail="Failed to update inventory.")
+    return {"status": "success", "message": f"{body.item_name} updated."}
 
 
 # --- LOCATION SERVICES ---

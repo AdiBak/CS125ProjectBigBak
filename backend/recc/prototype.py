@@ -91,6 +91,40 @@ class SmartShoppingAssistant:
 
         return sorted(ranked_needs, key=lambda x: x["urgency_score"], reverse=True)
 
+    def restock_item(self, user_id: str, item_name: str) -> bool:
+        """
+        Marks an item as restocked (stock=1.0, last_buy=0).
+        If the row doesn't exist, inserts it so new items can be added from the app.
+        """
+        return self.set_inventory_item(user_id, item_name, 1.0, 0)
+
+    def set_inventory_item(
+        self, user_id: str, item_name: str, stock: float, last_buy: int
+    ) -> bool:
+        """
+        Sets an inventory item's stock (0.0-1.0) and last_buy (days ago).
+        Inserts if the row doesn't exist, otherwise updates. Use this to add with
+        custom level or to edit stock so items show up on Home again.
+        """
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            cursor.execute(
+                "UPDATE inventory SET stock = ?, last_buy = ? WHERE user_id = ? AND item_name = ?",
+                (stock, last_buy, user_id, item_name),
+            )
+            if cursor.rowcount == 0:
+                cursor.execute(
+                    "INSERT INTO inventory (user_id, item_name, stock, last_buy) VALUES (?, ?, ?, ?)",
+                    (user_id, item_name, stock, last_buy),
+                )
+            conn.commit()
+            conn.close()
+            return True
+        except Exception as e:
+            print(f"set_inventory_item error: {e}")
+            return False
+
     def get_products_for_need(self, query, top_n=3):
         """
         Step 2: Find the best products for the selected query.

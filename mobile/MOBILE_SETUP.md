@@ -130,41 +130,21 @@ If **Safari/curl on your Mac** can open `http://YOUR_MAC_IP:8000/api/v1/health` 
 
 ---
 
-## 3c. Fix: Safari on iPhone works but the app still says "Network request failed"
+## 3c. If you still see "Network request failed"
 
-**Cause:** Expo Go on iOS uses **App Transport Security**, which blocks **HTTP** requests from app code. Safari can open HTTP links, but the same URL is blocked when requested by the app. Our `app.json` ATS settings don’t apply because Expo Go uses its own native binary.
+If Safari on your iPhone can open your health check URL but the app still shows  
+**"Network request failed"**, check the following:
 
-**Fix: use HTTPS for the API** with **ngrok** (free tunnel that gives you an HTTPS URL to your local backend):
+1. **`EXPO_PUBLIC_API_URL` is HTTPS, not HTTP**  
+   - In `mobile/.env`, the value must start with `https://` and point to your **ngrok** URL  
+     (for example: `https://your-subdomain.ngrok-free.dev`), not `http://localhost:8000`.
 
-1. **Install ngrok** (one-time)
-   - From [ngrok.com](https://ngrok.com) download the app, or: `brew install ngrok` (macOS).
-   - Sign up for a free account and run `ngrok config add-authtoken YOUR_TOKEN` once.
+2. **Expo dev server was restarted after changes**  
+   - After editing `.env`, stop Expo (`Ctrl+C`), run `npm start` again, then reload the app in Expo Go.
 
-2. **Start your backend** (in one terminal):
-   ```bash
-   cd backend && python main.py
-   ```
-
-3. **Start ngrok** (in a second terminal):
-   ```bash
-   ngrok http 8000
-   ```
-   You’ll see something like: `Forwarding  https://abc123.ngrok-free.app -> http://localhost:8000`
-
-4. **Point the app at the HTTPS URL**
-   - Create or edit `mobile/.env`:
-     ```
-     EXPO_PUBLIC_API_URL=https://abc123.ngrok-free.app
-     ```
-     Use the **https** URL from the ngrok terminal (your URL will be different each time unless you have a paid ngrok plan).
-
-5. **Restart Expo and reload the app**
-   - Stop the Expo dev server (`Ctrl+C`), then run `npm start` again from the `mobile` folder.
-   - Reload the app in Expo Go on your iPhone (pull to refresh or shake → Reload).
-
-The app will now call your backend over HTTPS; iOS will allow it and the "Network request failed" error should go away.
-
-**Note:** The free ngrok URL changes each time you restart ngrok. If you restart ngrok, update `EXPO_PUBLIC_API_URL` in `mobile/.env` and restart Expo again.
+3. **ngrok + backend are running**  
+   - `python main.py` is running in `backend/`.  
+   - `ngrok http 8000` is running and still shows a forwarding HTTPS URL.
 
 ---
 

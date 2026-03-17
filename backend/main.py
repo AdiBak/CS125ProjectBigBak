@@ -30,6 +30,9 @@ class RecommendationItem(BaseModel):
     nearest_store_address: Optional[str] = Field(
         None, description="Address of the nearest Trader Joe's (if available)"
     )
+    nearest_store_distance_mi: Optional[float] = Field(
+        None, description="Distance to nearest store in miles (if available)"
+    )
 
 
 class RecommendationResponse(BaseModel):
@@ -139,10 +142,16 @@ def get_home_dashboard(
     context_str = "At home"
     nearest_store = None
     if lat is not None and lon is not None:
-        stores = loc_service.get_nearby_businesses(lat, lon, radius=2000)
+        print(f"Home dashboard: using device location lat={lat}, lon={lon}")
+        stores = loc_service.get_nearby_businesses(lat, lon, radius=8000)
         if stores:
             nearest_store = stores[0]
-            context_str = f"Near {nearest_store['name']}"
+            dist = nearest_store.get("distance_mi")
+            context_str = f"Near {nearest_store['name']}" + (f" ({dist} mi)" if dist is not None else "")
+        else:
+            print("Home dashboard: no stores found for this location (Overpass may have returned empty or failed)")
+    else:
+        print("Home dashboard: no lat/lon provided — request location permission on device and ensure API is called with ?lat=...&lon=...")
 
     results = []
     for p in priorities:
@@ -156,7 +165,8 @@ def get_home_dashboard(
                     reason=p["reason"],
                     suggested_products=[ProductSuggestion(**prod) for prod in products],
                     nearest_store_name=nearest_store["name"] if nearest_store else None,
-                    nearest_store_address=nearest_store["address"] if nearest_store else None,
+                    nearest_store_address=nearest_store.get("address") if nearest_store else None,
+                    nearest_store_distance_mi=nearest_store.get("distance_mi") if nearest_store else None,
                 )
             )
 

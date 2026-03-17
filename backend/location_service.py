@@ -1,5 +1,16 @@
+import math
 import requests
 
+
+def _haversine_mi(lat1, lon1, lat2, lon2):
+    """Return distance in miles between two (lat, lon) points."""
+    R = 3959  # Earth radius in miles
+    phi1, phi2 = math.radians(lat1), math.radians(lat2)
+    dphi = math.radians(lat2 - lat1)
+    dlam = math.radians(lon2 - lon1)
+    a = math.sin(dphi / 2) ** 2 + math.cos(phi1) * math.cos(phi2) * math.sin(dlam / 2) ** 2
+    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+    return R * c
 
 
 class BusinessLocationService:
@@ -31,24 +42,21 @@ class BusinessLocationService:
 
         # Build the Overpass QL query specifically for Trader Joe's (case-insensitive)
         full_query = f"""
-        [out:json][timeout:25];
-        (
-            node["name"~"Trader Joe's",i](around:{radius},{lat},{lon});
-            way["name"~"Trader Joe's",i](around:{radius},{lat},{lon});
-        );
+        [out:json][timeout:60];
+        nwr["name"="Trader Joe's"](around:{radius},{lat},{lon});
         out center;
         """
 
         try:
             response = requests.post(
-                self.OVERPASS_URL, data={"data": full_query}, timeout=10
+                self.OVERPASS_URL, data={"data": full_query}, timeout=20
             )
             response.raise_for_status()
             data = response.json()
-
-            return self._parse_results(data.get("elements", []), lat, lon)
+            elements = data.get("elements", [])
+            return self._parse_results(elements, lat, lon)
         except Exception as e:
-            print(f"Error fetching data from Overpass: {e}. Using mock location data.")
+            print(f"Overpass failed for lat={lat}, lon={lon}: {e}. Using mock location data.")
             # Fallback mock store
             return [
                 {
@@ -57,6 +65,7 @@ class BusinessLocationService:
                     "lat": lat + 0.005,
                     "lon": lon + 0.005,
                     "address": "123 Mockingbird Lane, Irvine",
+                    "distance_mi": 0.3,
                     "osm_id": 999999999,
                 }
             ]
@@ -64,14 +73,18 @@ class BusinessLocationService:
     def _parse_results(self, elements, user_lat, user_lon):
         """
         Parses raw Overpass JSON elements into a clean list of businesses.
+        Adds distance from user and sorts by distance (nearest first).
         """
         results = []
         for element in elements:
-            lat = element.get("lat") or element.get("center", {}).get("lat")
-            lon = element.get("lon") or element.get("center", {}).get("lon")
+            lat = element.get("lat") or (element.get("center") or {}).get("lat")
+            lon = element.get("lon") or (element.get("center") or {}).get("lon")
+            if lat is None or lon is None:
+                continue
 
             tags = element.get("tags", {})
             name = tags.get("name", "Trader Joe's")
+            distance_mi = round(_haversine_mi(user_lat, user_lon, lat, lon), 1)
 
             results.append(
                 {
@@ -80,10 +93,12 @@ class BusinessLocationService:
                     "lat": lat,
                     "lon": lon,
                     "address": self._format_address(tags),
+                    "distance_mi": distance_mi,
                     "osm_id": element.get("id"),
                 }
             )
 
+        results.sort(key=lambda s: s["distance_mi"])
         return results
 
     def _format_address(self, tags):
@@ -91,9 +106,22 @@ class BusinessLocationService:
         street = tags.get("addr:street", "")
         house_number = tags.get("addr:housenumber", "")
         city = tags.get("addr:city", "")
+        state = tags.get("addr:state", "")
+        postcode = tags.get("addr:postcode", "")
 
-        if street or house_number:
-            return f"{house_number} {street}, {city}".strip(", ")
+        parts = []
+        if house_number or street:
+            parts.append(f"{house_number} {street}".strip())
+        if city:
+            parts.append(city)
+        if state and postcode:
+            parts.append(f"{state} {postcode}".strip())
+        elif state:
+            parts.append(state)
+        elif postcode:
+            parts.append(postcode)
+        if parts:
+            return ", ".join(parts)
         return "Address unavailable"
 
 
@@ -106,7 +134,7 @@ if __name__ == "__main__":
     service = BusinessLocationService()
     print(f"Searching for Trader Joe's near {test_lat}, {test_lon}...")
 
-    stores = service.get_nearby_businesses(test_lat, test_lon, radius=10000)
+    stores = service.get_nearby_businesses(test_lat, test_lon, radius=5000)
 
     print(f"Found {len(stores)} locations:")
     for store in stores:

@@ -150,6 +150,7 @@ export default function HomeScreen() {
                       products: JSON.stringify(rec.suggested_products ?? []),
                       nearest_store_name: rec.nearest_store_name ?? '',
                       nearest_store_address: rec.nearest_store_address ?? '',
+                      nearest_store_distance_mi: rec.nearest_store_distance_mi != null ? String(rec.nearest_store_distance_mi) : '',
                     },
                   })
                 }
@@ -198,6 +199,8 @@ function RecommendationCard({
   const match = product?.relevance;
   const rawStoreLabel = item.nearest_store_name ?? "Trader Joe's";
   const storeLabel = rawStoreLabel.replace(/\s*\(Mock\)/i, '');
+  const distMi = item.nearest_store_distance_mi;
+  const storeSubtext = distMi != null ? `${distMi} mi` : 'nearby';
 
   return (
     <Pressable
@@ -224,7 +227,9 @@ function RecommendationCard({
           <Text style={styles.reasonLabel}>Why Now?</Text>
           <Text style={[styles.reasonText, { color: colors.text }]}>{item.reason}</Text>
         </View>
-        <Text style={[styles.storeInfo, { color: colors.text }]}>📍 Trader Joe's — nearby</Text>
+        <Text style={[styles.storeInfo, { color: colors.text }]}>
+          📍 {storeLabel} — {storeSubtext}
+        </Text>
         <View style={styles.actions}>
           <TouchableOpacity
             style={[styles.btn, styles.btnPrimary, { backgroundColor: colors.tint }]}

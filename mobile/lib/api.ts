@@ -24,6 +24,7 @@ export type RecommendationItem = {
   suggested_products: ProductSuggestion[];
   nearest_store_name?: string | null;
   nearest_store_address?: string | null;
+  nearest_store_distance_mi?: number | null;
 };
 
 export type RecommendationResponse = {

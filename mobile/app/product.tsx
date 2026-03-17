@@ -26,6 +26,7 @@ export default function ProductScreen() {
     products?: string;
     nearest_store_name?: string;
     nearest_store_address?: string;
+    nearest_store_distance_mi?: string;
   }>();
   const colorScheme = useColorScheme();
   const c = Colors[colorScheme ?? 'light'];
@@ -40,7 +41,8 @@ export default function ProductScreen() {
   const price = primaryProduct?.price ?? '—';
   const match = primaryProduct?.relevance;
   const nearestName = (params.nearest_store_name as string) || "Trader Joe's";
-  const nearestAddress = (params.nearest_store_address as string) || 'Nearby';
+  const nearestAddress = (params.nearest_store_address as string) || '';
+  const nearestDistMi = params.nearest_store_distance_mi ? `${params.nearest_store_distance_mi} mi` : '';
 
   const [adding, setAdding] = useState(false);
 
@@ -96,12 +98,15 @@ export default function ProductScreen() {
       <View style={[styles.card, { backgroundColor: c.cardBg, borderColor: c.border }]}>
         <Text style={[styles.cardTitle, { color: c.text }]}>📍 Nearby store</Text>
         <View style={[styles.storeRow, { borderColor: c.border }]}>
-          <View>
+          <View style={{ flex: 1 }}>
             <Text style={[styles.storeName, { color: c.text }]}>{nearestName}</Text>
-            <Text style={[styles.storeDistance, { color: c.text, opacity: 0.8 }]}>
-              {nearestAddress}
-            </Text>
+            {nearestAddress ? (
+              <Text style={[styles.storeAddress, { color: c.text }]}>{nearestAddress}</Text>
+            ) : null}
           </View>
+          {nearestDistMi ? (
+            <Text style={[styles.storeDistance, { color: c.tint }]}>{nearestDistMi}</Text>
+          ) : null}
         </View>
       </View>
 
@@ -171,7 +176,8 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
   },
   storeName: { fontSize: 14, fontWeight: '600' },
-  storeDistance: { fontSize: 13 },
+  storeAddress: { fontSize: 13, marginTop: 2, opacity: 0.85 },
+  storeDistance: { fontSize: 13, fontWeight: '600' },
   similarList: { marginHorizontal: -4 },
   similarItem: {
     width: 110,

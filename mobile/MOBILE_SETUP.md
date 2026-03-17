@@ -181,4 +181,14 @@ If Safari on your iPhone can open your health check URL but the app still shows
   - “Restock” button (sets stock to full and last_buy to 0 in the DB).
   - ➕ Add item (with initial stock level presets: Low/Medium/Full).
   - Tap an item to edit stock and days since last purchase (so you can make items reappear on Home).
-- **Settings**: Static UI wired to the existing `/settings` endpoint (mock data).
+- **Settings**: User profile, preferences, and notification toggles. “Low stock warnings” uses **local notifications** (no EAS or push token needed).
+
+---
+
+## Local notifications (low stock)
+
+The app uses **local notifications** only: when you open **Home** and have items below the low-stock threshold (with “Low stock warnings” on in Settings), a notification is scheduled and appears a couple of seconds later. No server push, EAS project ID, or development build required.
+
+- Allow notifications when the app prompts you.
+- To test: set an item to low stock, then open the Home tab; you should see a “Low stock” notification shortly after.
+- Throttled to at most once per 4 hours so you’re not spammed if you open Home often.

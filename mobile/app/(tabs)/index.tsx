@@ -21,6 +21,7 @@ import {
   type RecommendationItem,
   type RecommendationResponse,
 } from '@/lib/api';
+import { scheduleLowStockNotification } from '@/lib/pushNotifications';
 import * as Linking from 'expo-linking';
 import { useRouter } from 'expo-router';
 
@@ -56,6 +57,9 @@ export default function HomeScreen() {
 
       const res = await getHomeDashboard(lat, lon);
       setData(res);
+      if (res.low_stock_items?.length) {
+        scheduleLowStockNotification(res.low_stock_items);
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load');
     } finally {

@@ -1,6 +1,9 @@
+import json
 import os
+import time
 from typing import List, Optional
 
+import requests
 from fastapi import Depends, FastAPI, HTTPException, Path, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
@@ -39,6 +42,10 @@ class RecommendationResponse(BaseModel):
     user_id: str
     context: str
     recommendations: List[RecommendationItem]
+    low_stock_items: List[str] = Field(
+        default_factory=list,
+        description="Item names with stock below threshold (for local notifications when low_stock_warnings on)",
+    )
 
 
 class Business(BaseModel):
@@ -77,6 +84,18 @@ class UserSettings(BaseModel):
     price_sensitivity: str
     location_alerts: bool
     low_stock_warnings: bool
+    push_token: Optional[str] = None
+
+
+class UserSettingsUpdate(BaseModel):
+    """Partial update for settings; all fields optional."""
+    user_name: Optional[str] = None
+    email: Optional[str] = None
+    preferred_brands: Optional[List[str]] = None
+    price_sensitivity: Optional[str] = None
+    location_alerts: Optional[bool] = None
+    low_stock_warnings: Optional[bool] = None
+    push_token: Optional[str] = None
 
 
 # ==========================================
@@ -98,6 +117,7 @@ app.add_middleware(
 )
 
 DB_PATH = os.path.join(os.path.dirname(__file__), "bigbak.db")
+LOW_STOCK_THRESHOLD = 0.3
 assistant = SmartShoppingAssistant(db_path=DB_PATH)
 location_service = BusinessLocationService()
 
@@ -136,8 +156,17 @@ def get_home_dashboard(
 ):
     """
     Populates the main dashboard with contextual info and high-priority recommendations.
+    Returns low_stock_items so the app can show a local notification (no push needed).
     """
     priorities = recc_engine.prioritize_needs(user_id)
+
+    # Compute low-stock items for local notifications (only if user has setting on)
+    low_stock_items: List[str] = []
+    _ensure_settings_table()
+    settings_obj = _get_settings_from_db(user_id)
+    if settings_obj and settings_obj.low_stock_warnings:
+        inv = assistant.get_user_inventory(user_id)
+        low_stock_items = [name for name, data in inv.items() if float(data.get("stock", 1)) < LOW_STOCK_THRESHOLD]
 
     context_str = "At home"
     nearest_store = None
@@ -171,7 +200,10 @@ def get_home_dashboard(
             )
 
     return RecommendationResponse(
-        user_id=user_id, context=context_str, recommendations=results
+        user_id=user_id,
+        context=context_str,
+        recommendations=results,
+        low_stock_items=low_stock_items,
     )
 
 
@@ -266,13 +298,8 @@ def get_nearby_tj(
 
 
 # --- SETTINGS ---
-@app.get(
-    "/api/v1/users/{user_id}/settings", response_model=UserSettings, tags=["Settings"]
-)
-def get_user_settings(user_id: str = Path(...)):
-    """
-    Mock endpoint to retrieve user settings.
-    """
+
+def _default_settings() -> UserSettings:
     return UserSettings(
         user_name="Alex Student",
         email="alex@example.com",
@@ -281,6 +308,285 @@ def get_user_settings(user_id: str = Path(...)):
         location_alerts=True,
         low_stock_warnings=True,
     )
+
+
+def _ensure_settings_table():
+    import sqlite3
+    conn = sqlite3.connect(DB_PATH)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS user_settings (
+            user_id TEXT PRIMARY KEY,
+            user_name TEXT,
+            email TEXT,
+            preferred_brands TEXT,
+            price_sensitivity TEXT,
+            location_alerts INTEGER,
+            low_stock_warnings INTEGER,
+            push_token TEXT,
+            last_near_store_push_at REAL,
+            last_low_stock_push_at REAL
+        )
+    """)
+    # Migrate existing DBs: add columns if missing
+    for col_sql in [
+        "ALTER TABLE user_settings ADD COLUMN push_token TEXT",
+        "ALTER TABLE user_settings ADD COLUMN last_near_store_push_at REAL",
+        "ALTER TABLE user_settings ADD COLUMN last_low_stock_push_at REAL",
+    ]:
+        try:
+            conn.execute(col_sql)
+        except Exception:
+            pass
+    conn.commit()
+    conn.close()
+
+
+def _get_settings_from_db(user_id: str) -> Optional[UserSettings]:
+    import sqlite3
+    conn = sqlite3.connect(DB_PATH)
+    row = conn.execute(
+        "SELECT user_name, email, preferred_brands, price_sensitivity, location_alerts, low_stock_warnings, push_token FROM user_settings WHERE user_id = ?",
+        (user_id,),
+    ).fetchone()
+    conn.close()
+    if not row:
+        return None
+    return UserSettings(
+        user_name=row[0] or "Alex Student",
+        email=row[1] or "alex@example.com",
+        preferred_brands=json.loads(row[2]) if row[2] else ["Trader Joe's", "365"],
+        price_sensitivity=row[3] or "Medium",
+        location_alerts=bool(row[4] if row[4] is not None else 1),
+        low_stock_warnings=bool(row[5] if row[5] is not None else 1),
+        push_token=row[6] if len(row) > 6 else None,
+    )
+
+
+def _save_settings_to_db(user_id: str, s: UserSettings):
+    import sqlite3
+    conn = sqlite3.connect(DB_PATH)
+    conn.execute(
+        """INSERT INTO user_settings (user_id, user_name, email, preferred_brands, price_sensitivity, location_alerts, low_stock_warnings, push_token)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+           ON CONFLICT(user_id) DO UPDATE SET
+             user_name=excluded.user_name,
+             email=excluded.email,
+             preferred_brands=excluded.preferred_brands,
+             price_sensitivity=excluded.price_sensitivity,
+             location_alerts=excluded.location_alerts,
+             low_stock_warnings=excluded.low_stock_warnings,
+             push_token=excluded.push_token""",
+        (
+            user_id,
+            s.user_name,
+            s.email,
+            json.dumps(s.preferred_brands),
+            s.price_sensitivity,
+            1 if s.location_alerts else 0,
+            1 if s.low_stock_warnings else 0,
+            s.push_token,
+        ),
+    )
+    conn.commit()
+    conn.close()
+
+
+def _get_settings_row_raw(user_id: str) -> Optional[tuple]:
+    """Get settings row including server-only fields (push_token, last_near_store_push_at)."""
+    import sqlite3
+    conn = sqlite3.connect(DB_PATH)
+    row = conn.execute(
+        "SELECT push_token, last_near_store_push_at FROM user_settings WHERE user_id = ?",
+        (user_id,),
+    ).fetchone()
+    conn.close()
+    return row
+
+
+def _set_last_near_store_push_at(user_id: str):
+    import time
+    import sqlite3
+    conn = sqlite3.connect(DB_PATH)
+    conn.execute(
+        "UPDATE user_settings SET last_near_store_push_at = ? WHERE user_id = ?",
+        (time.time(), user_id),
+    )
+    conn.commit()
+    conn.close()
+
+
+def _send_expo_push(to_token: str, title: str, body: str) -> bool:
+    """Send one push via Expo Push API. Returns True if accepted. Logs ticket/receipt errors."""
+    if not to_token or not to_token.strip():
+        print("Expo push skipped: empty token")
+        return False
+    token = to_token.strip()
+    try:
+        r = requests.post(
+            "https://exp.host/--/api/v2/push/send",
+            json={"to": token, "title": title, "body": body, "sound": "default"},
+            headers={"Content-Type": "application/json", "Accept": "application/json"},
+            timeout=10,
+        )
+        if r.status_code != 200:
+            print(f"Expo push rejected: status={r.status_code} body={r.text[:200]}")
+            return False
+        data = r.json()
+        # Response can be {"data": {"status": "ok", "id": "..."}} or {"data": [{"status": "ok", "id": "..."}]}
+        ticket_or_list = data.get("data")
+        if isinstance(ticket_or_list, dict):
+            ticket_or_list = [ticket_or_list]
+        for ticket in (ticket_or_list or []):
+            if isinstance(ticket, dict) and ticket.get("status") == "error":
+                print(f"Expo push ticket error: {ticket.get('message')} details={ticket.get('details')}")
+                return False
+        ticket_ids = [t.get("id") for t in (ticket_or_list or []) if isinstance(t, dict) and t.get("id")]
+        print(f"Expo push sent: title={title!r} token={token[:20]}... ticket_ids={ticket_ids}")
+        # Optionally check receipts after a short delay to see delivery status (e.g. DeviceNotRegistered)
+        if ticket_ids:
+            _log_expo_receipts_after_delay(ticket_ids)
+        return True
+    except Exception as e:
+        print(f"Expo push send failed: {e}")
+        return False
+
+
+def _log_expo_receipts_after_delay(ticket_ids: list):
+    """After 5s, fetch push receipts and log any delivery errors (runs in background)."""
+    import threading
+    def _fetch():
+        time.sleep(5)
+        try:
+            r = requests.post(
+                "https://exp.host/--/api/v2/push/getReceipts",
+                json={"ids": ticket_ids},
+                headers={"Content-Type": "application/json", "Accept": "application/json"},
+                timeout=10,
+            )
+            if r.status_code != 200:
+                return
+            data = r.json()
+            for rid, receipt in (data.get("data") or {}).items():
+                if isinstance(receipt, dict) and receipt.get("status") == "error":
+                    print(f"Expo push receipt error (delivery failed): {receipt.get('message')} details={receipt.get('details')}")
+        except Exception:
+            pass
+    threading.Thread(target=_fetch, daemon=True).start()
+
+
+def _set_last_low_stock_push_at(user_id: str):
+    import sqlite3
+    conn = sqlite3.connect(DB_PATH)
+    try:
+        conn.execute(
+            "UPDATE user_settings SET last_low_stock_push_at = ? WHERE user_id = ?",
+            (time.time(), user_id),
+        )
+        conn.commit()
+    except Exception:
+        pass
+    conn.close()
+
+
+def run_low_stock_pushes():
+    """
+    Send push notifications to users who have low_stock_warnings on and a push token,
+    for items in their inventory with stock below LOW_STOCK_THRESHOLD.
+    Throttled to at most once per 4 hours per user.
+    """
+    import sqlite3
+    _ensure_settings_table()
+    conn = sqlite3.connect(DB_PATH)
+    try:
+        rows = conn.execute(
+            "SELECT user_id, push_token, last_low_stock_push_at FROM user_settings WHERE low_stock_warnings = 1 AND push_token IS NOT NULL AND push_token != ''"
+        ).fetchall()
+    except Exception as e:
+        print(f"Low-stock push: settings query failed ({e}), trying without last_low_stock_push_at")
+        rows = conn.execute(
+            "SELECT user_id, push_token FROM user_settings WHERE low_stock_warnings = 1 AND push_token IS NOT NULL AND push_token != ''"
+        ).fetchall()
+        rows = [(r[0], r[1], None) for r in rows]
+    conn.close()
+
+    if not rows:
+        print("Low-stock push: no users with push_token and low_stock_warnings on")
+        return
+    print(f"Low-stock push: checking {len(rows)} user(s)")
+
+    for row in rows:
+        user_id = row[0]
+        push_token = row[1]
+        last_at = row[2] if len(row) > 2 else None
+        if last_at is not None and (time.time() - last_at) < 4 * 3600:
+            print(f"Low-stock push: {user_id} throttled (last sent {int((time.time() - last_at) / 60)}m ago)")
+            continue
+        inv = assistant.get_user_inventory(user_id)
+        low_items = [name for name, data in inv.items() if float(data.get("stock", 1)) < LOW_STOCK_THRESHOLD]
+        if not low_items:
+            print(f"Low-stock push: {user_id} has no items below {LOW_STOCK_THRESHOLD}")
+            continue
+        if len(low_items) == 1:
+            body = f"'{low_items[0]}' is running low."
+        else:
+            body = f"Your {', '.join(low_items[:5])}{'…' if len(low_items) > 5 else ''} are running low."
+        print(f"Low-stock push: sending to {user_id} for {low_items}")
+        if _send_expo_push(push_token, "Low stock", body):
+            _set_last_low_stock_push_at(user_id)
+
+
+@app.get(
+    "/api/v1/users/{user_id}/settings", response_model=UserSettings, tags=["Settings"]
+)
+def get_user_settings(user_id: str = Path(...)):
+    """
+    Get user settings. Returns stored settings or defaults (and persists defaults on first access).
+    """
+    _ensure_settings_table()
+    settings = _get_settings_from_db(user_id)
+    if settings is None:
+        settings = _default_settings()
+        _save_settings_to_db(user_id, settings)
+    return settings
+
+
+@app.patch(
+    "/api/v1/users/{user_id}/settings", response_model=UserSettings, tags=["Settings"]
+)
+def update_user_settings(
+    user_id: str = Path(...),
+    body: UserSettingsUpdate = ...,
+):
+    """
+    Update user settings (partial update). Returns full settings after update.
+    """
+    _ensure_settings_table()
+    current = _get_settings_from_db(user_id)
+    if current is None:
+        current = _default_settings()
+        _save_settings_to_db(user_id, current)
+    update = body.model_dump(exclude_unset=True)
+    new_settings = UserSettings(
+        user_name=update.get("user_name", current.user_name),
+        email=update.get("email", current.email),
+        preferred_brands=update.get("preferred_brands", current.preferred_brands),
+        price_sensitivity=update.get("price_sensitivity", current.price_sensitivity),
+        location_alerts=update.get("location_alerts", current.location_alerts),
+        low_stock_warnings=update.get("low_stock_warnings", current.low_stock_warnings),
+        push_token=update.get("push_token", current.push_token),
+    )
+    _save_settings_to_db(user_id, new_settings)
+    return new_settings
+
+
+@app.post("/internal/send-low-stock-pushes", include_in_schema=False)
+def trigger_low_stock_pushes():
+    """
+    Trigger low-stock push notifications for all users with the setting on.
+    Intended for cron (e.g. daily). No auth for now; add if needed.
+    """
+    run_low_stock_pushes()
+    return {"status": "ok"}
 
 
 @app.get("/", response_class=HTMLResponse, include_in_schema=False)

@@ -31,6 +31,7 @@ export type RecommendationResponse = {
   user_id: string;
   context: string;
   recommendations: RecommendationItem[];
+  low_stock_items?: string[];
 };
 
 export type InventoryItem = {
@@ -47,6 +48,7 @@ export type UserSettings = {
   price_sensitivity: string;
   location_alerts: boolean;
   low_stock_warnings: boolean;
+  push_token?: string | null;
 };
 
 async function fetchApi<T>(path: string, options?: RequestInit): Promise<T> {
@@ -87,6 +89,15 @@ export async function getInventory() {
 
 export async function getUserSettings() {
   return fetchApi<UserSettings>(`/api/v1/users/${USER_ID}/settings`);
+}
+
+export type UserSettingsUpdate = Partial<UserSettings>;
+
+export async function updateUserSettings(update: UserSettingsUpdate) {
+  return fetchApi<UserSettings>(`/api/v1/users/${USER_ID}/settings`, {
+    method: 'PATCH',
+    body: JSON.stringify(update),
+  });
 }
 
 export async function restockItem(itemName: string) {

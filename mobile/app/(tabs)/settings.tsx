@@ -10,14 +10,16 @@ import {
 
 import Colors from '@/constants/Colors';
 import { useColorScheme } from '@/components/useColorScheme';
-import { getUserSettings, type UserSettings } from '@/lib/api';
+import { getUserSettings, updateUserSettings, type UserSettings } from '@/lib/api';
+import { requestNotificationPermission } from '@/lib/pushNotifications';
 
 export default function SettingsScreen() {
   const colorScheme = useColorScheme();
-  const c = Colors[colorScheme];
+  const c = Colors[colorScheme ?? 'light'];
   const [settings, setSettings] = useState<UserSettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [updating, setUpdating] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -32,6 +34,11 @@ export default function SettingsScreen() {
         if (!cancelled) setLoading(false);
       });
     return () => { cancelled = true; };
+  }, []);
+
+  // Ensure we have notification permission for local low-stock alerts
+  useEffect(() => {
+    requestNotificationPermission();
   }, []);
 
   if (loading) {
@@ -70,8 +77,36 @@ export default function SettingsScreen() {
 
           <View style={styles.section}>
             <Text style={[styles.sectionTitle, { color: c.text }]}>Notifications</Text>
-            <RowSwitch label="Location-based alerts" value={settings.location_alerts} colors={c} />
-            <RowSwitch label="Low stock warnings" value={settings.low_stock_warnings} colors={c} />
+            <RowSwitch
+              label="Location-based alerts"
+              value={settings.location_alerts}
+              disabled={updating}
+              onToggle={async (value) => {
+                setUpdating(true);
+                try {
+                  const next = await updateUserSettings({ location_alerts: value });
+                  setSettings(next);
+                } finally {
+                  setUpdating(false);
+                }
+              }}
+              colors={c}
+            />
+            <RowSwitch
+              label="Low stock warnings"
+              value={settings.low_stock_warnings}
+              disabled={updating}
+              onToggle={async (value) => {
+                setUpdating(true);
+                try {
+                  const next = await updateUserSettings({ low_stock_warnings: value });
+                  setSettings(next);
+                } finally {
+                  setUpdating(false);
+                }
+              }}
+              colors={c}
+            />
           </View>
         </>
       ) : null}
@@ -101,16 +136,26 @@ function Row({
 function RowSwitch({
   label,
   value,
+  disabled,
+  onToggle,
   colors,
 }: {
   label: string;
   value: boolean;
+  disabled?: boolean;
+  onToggle: (value: boolean) => void | Promise<void>;
   colors: typeof Colors.light;
 }) {
   return (
     <View style={[styles.row, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
       <Text style={[styles.rowLabel, { color: colors.text }]}>{label}</Text>
-      <Switch value={value} trackColor={{ false: '#bdc3c7', true: colors.tint }} thumbColor="#fff" />
+      <Switch
+        value={value}
+        disabled={disabled}
+        onValueChange={onToggle}
+        trackColor={{ false: '#bdc3c7', true: colors.tint }}
+        thumbColor="#fff"
+      />
     </View>
   );
 }

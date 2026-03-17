@@ -1,4 +1,5 @@
 import sqlite3
+import time
 
 import pandas as pd
 from sklearn.feature_extraction.text import TfidfVectorizer
@@ -24,22 +25,43 @@ class SmartShoppingAssistant:
         if not self.df.empty:
             self.tfidf_matrix = self.tfidf.fit_transform(self.df["name"])
 
+    # Demo: 1 real hour = 1 "day"; stock decays 10% per hour (so after ~2.5h full becomes low).
+    DECAY_PER_HOUR = 0.9  # multiplier per hour
+
     def get_user_inventory(self, user_id: str) -> dict:
         """
-        Fetches the inventory for a specific user from the database.
-        Assumes an 'inventory' table exists with columns: user_id, item_name, stock, last_buy
+        Fetches the inventory for a specific user. Applies hourly decay: 1 real hour = 1 "day",
+        and stock decreases by 10% per hour from last_updated_utc so the demo can show
+        low-stock notifications without waiting real days.
         """
         try:
             conn = sqlite3.connect(self.db_path)
-            query = "SELECT item_name, stock, last_buy FROM inventory WHERE user_id = ?"
-            df_inv = pd.read_sql_query(query, conn, params=(user_id,))
+            now = time.time()
+            try:
+                query = "SELECT item_name, stock, last_buy, last_updated_utc FROM inventory WHERE user_id = ?"
+                df_inv = pd.read_sql_query(query, conn, params=(user_id,))
+            except Exception:
+                query = "SELECT item_name, stock, last_buy FROM inventory WHERE user_id = ?"
+                df_inv = pd.read_sql_query(query, conn, params=(user_id,))
+                df_inv["last_updated_utc"] = None
             conn.close()
 
             user_inventory = {}
             for _, row in df_inv.iterrows():
+                stock = float(row["stock"])
+                last_buy = int(row["last_buy"])
+                last_utc = row.get("last_updated_utc")
+                if last_utc is None or (isinstance(last_utc, float) and (last_utc != last_utc)):
+                    last_utc = now - (last_buy * 24 * 3600) if last_buy else now
+                last_utc = float(last_utc)
+                hours_since = max(0, (now - last_utc) / 3600)
+                # Effective stock after decay (10% per hour)
+                effective_stock = max(0.0, min(1.0, stock * (self.DECAY_PER_HOUR ** hours_since)))
+                # 1 real hour = 1 "day" for display and urgency
+                effective_days_ago = hours_since / 24.0
                 user_inventory[row["item_name"]] = {
-                    "stock": float(row["stock"]),
-                    "last_buy": int(row["last_buy"]),
+                    "stock": effective_stock,
+                    "last_buy": int(round(effective_days_ago)),
                 }
             return user_inventory
 
@@ -47,7 +69,6 @@ class SmartShoppingAssistant:
             print(
                 f"Database error or missing inventory table: {e}. Using fallback mock data."
             )
-            # Fallback mock data if the table doesn't exist yet so the app doesn't break
             return {
                 "Cheese": {"stock": 0.1, "last_buy": 45},
                 "Milk": {"stock": 0.9, "last_buy": 2},
@@ -103,27 +124,44 @@ class SmartShoppingAssistant:
     ) -> bool:
         """
         Sets an inventory item's stock (0.0-1.0) and last_buy (days ago).
-        Inserts if the row doesn't exist, otherwise updates. Use this to add with
-        custom level or to edit stock so items show up on Home again.
+        Resets last_updated_utc to now so hourly decay starts from this moment.
         """
         try:
             conn = sqlite3.connect(self.db_path)
             cursor = conn.cursor()
+            now = time.time()
             cursor.execute(
-                "UPDATE inventory SET stock = ?, last_buy = ? WHERE user_id = ? AND item_name = ?",
-                (stock, last_buy, user_id, item_name),
+                "UPDATE inventory SET stock = ?, last_buy = ?, last_updated_utc = ? WHERE user_id = ? AND item_name = ?",
+                (stock, last_buy, now, user_id, item_name),
             )
             if cursor.rowcount == 0:
                 cursor.execute(
-                    "INSERT INTO inventory (user_id, item_name, stock, last_buy) VALUES (?, ?, ?, ?)",
-                    (user_id, item_name, stock, last_buy),
+                    "INSERT INTO inventory (user_id, item_name, stock, last_buy, last_updated_utc) VALUES (?, ?, ?, ?, ?)",
+                    (user_id, item_name, stock, last_buy, now),
                 )
             conn.commit()
             conn.close()
             return True
         except Exception as e:
-            print(f"set_inventory_item error: {e}")
-            return False
+            # Fallback if last_updated_utc column missing (old DB)
+            try:
+                conn = sqlite3.connect(self.db_path)
+                cursor = conn.cursor()
+                cursor.execute(
+                    "UPDATE inventory SET stock = ?, last_buy = ? WHERE user_id = ? AND item_name = ?",
+                    (stock, last_buy, user_id, item_name),
+                )
+                if cursor.rowcount == 0:
+                    cursor.execute(
+                        "INSERT INTO inventory (user_id, item_name, stock, last_buy) VALUES (?, ?, ?, ?)",
+                        (user_id, item_name, stock, last_buy),
+                    )
+                conn.commit()
+                conn.close()
+                return True
+            except Exception as e2:
+                print(f"set_inventory_item error: {e2}")
+                return False
 
     def get_products_for_need(self, query, top_n=3):
         """

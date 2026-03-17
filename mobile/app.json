@@ -3,6 +3,12 @@
     "name": "Big Bak",
     "slug": "mobile",
     "version": "1.0.0",
+    "extra": {
+      "eas": {
+        "projectId": "69af3e4d-9401-469a-8184-49d47d272591"
+      },
+      "router": {}
+    },
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "mobile",
@@ -36,7 +42,9 @@
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
-      "expo-router"
-    ]
+      "expo-router",
+      "expo-notifications"
+    ],
+    "owner": "adibak"
   }
 }

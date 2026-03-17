@@ -6,6 +6,7 @@ import { useEffect } from 'react';
 import 'react-native-reanimated';
 
 import { useColorScheme } from '@/components/useColorScheme';
+import { requestNotificationPermission } from '@/lib/pushNotifications';
 
 export {
   // Catch any errors thrown by the Layout component.
@@ -35,6 +36,10 @@ export default function RootLayout() {
       SplashScreen.hideAsync();
     }
   }, [loaded]);
+
+  useEffect(() => {
+    requestNotificationPermission();
+  }, []);
 
   if (!loaded) {
     return null;

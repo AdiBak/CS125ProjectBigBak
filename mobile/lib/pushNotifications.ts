@@ -1,6 +1,17 @@
 import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
 
+// Show notifications even when app is in foreground (otherwise iOS often hides them)
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: false,
+    shouldShowBanner: true,
+    shouldShowList: true,
+  }),
+});
+
 /**
  * Request notification permission (for local notifications).
  * No push token or EAS project ID needed.
@@ -17,17 +28,17 @@ export async function requestNotificationPermission(): Promise<boolean> {
   }
 }
 
-const LOW_STOCK_THROTTLE_MS = 4 * 60 * 60 * 1000; // 4 hours
+const LOW_STOCK_THROTTLE_MS = 60 * 1000; // 1 minute (increase to 4*60*60*1000 for production)
 let lastLowStockNotifAt = 0;
 
 /**
- * Schedule a local notification for low-stock items (throttled to once per 4 hours).
+ * Schedule a local notification for low-stock items (throttled to avoid spam).
  * Call when Home loads and the API returns low_stock_items.
  */
 export async function scheduleLowStockNotification(items: string[]): Promise<void> {
   if (!items?.length) return;
   const now = Date.now();
-  if (now - lastLowStockNotifAt < LOW_STOCK_THROTTLE_MS) return;
+  if (lastLowStockNotifAt > 0 && now - lastLowStockNotifAt < LOW_STOCK_THROTTLE_MS) return;
   const granted = await requestNotificationPermission();
   if (!granted) return;
   try {

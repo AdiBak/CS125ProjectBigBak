@@ -25,7 +25,7 @@ class SmartShoppingAssistant:
         if not self.df.empty:
             self.tfidf_matrix = self.tfidf.fit_transform(self.df["name"])
 
-    # Demo: 1 real hour = 1 "day"; stock decays 10% per hour (so after ~2.5h full becomes low).
+    # Demo: 1 real hour = 1 "day"; stock decays 10% per hour.
     DECAY_PER_HOUR = 0.9  # multiplier per hour
 
     def get_user_inventory(self, user_id: str) -> dict:
@@ -52,13 +52,14 @@ class SmartShoppingAssistant:
                 last_buy = int(row["last_buy"])
                 last_utc = row.get("last_updated_utc")
                 if last_utc is None or (isinstance(last_utc, float) and (last_utc != last_utc)):
-                    last_utc = now - (last_buy * 24 * 3600) if last_buy else now
+                    # Demo-time mapping: "last_buy days" means last_buy real hours ago.
+                    last_utc = now - (last_buy * 3600) if last_buy else now
                 last_utc = float(last_utc)
                 hours_since = max(0, (now - last_utc) / 3600)
                 # Effective stock after decay (10% per hour)
                 effective_stock = max(0.0, min(1.0, stock * (self.DECAY_PER_HOUR ** hours_since)))
-                # 1 real hour = 1 "day" for display and urgency
-                effective_days_ago = hours_since / 24.0
+                # 1 real hour = 1 "day" for display and urgency.
+                effective_days_ago = hours_since
                 user_inventory[row["item_name"]] = {
                     "stock": effective_stock,
                     "last_buy": int(round(effective_days_ago)),
@@ -124,20 +125,23 @@ class SmartShoppingAssistant:
     ) -> bool:
         """
         Sets an inventory item's stock (0.0-1.0) and last_buy (days ago).
-        Resets last_updated_utc to now so hourly decay starts from this moment.
+        In demo mode, 1 real hour = 1 day, so we persist last_updated_utc as
+        (now - last_buy hours) so the edited days value shows immediately.
         """
         try:
             conn = sqlite3.connect(self.db_path)
             cursor = conn.cursor()
             now = time.time()
+            # Demo-time mapping: last_buy "days" are represented as real hours.
+            last_updated_utc = now - (last_buy * 3600)
             cursor.execute(
                 "UPDATE inventory SET stock = ?, last_buy = ?, last_updated_utc = ? WHERE user_id = ? AND item_name = ?",
-                (stock, last_buy, now, user_id, item_name),
+                (stock, last_buy, last_updated_utc, user_id, item_name),
             )
             if cursor.rowcount == 0:
                 cursor.execute(
                     "INSERT INTO inventory (user_id, item_name, stock, last_buy, last_updated_utc) VALUES (?, ?, ?, ?, ?)",
-                    (user_id, item_name, stock, last_buy, now),
+                    (user_id, item_name, stock, last_buy, last_updated_utc),
                 )
             conn.commit()
             conn.close()

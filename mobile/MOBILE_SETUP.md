@@ -173,15 +173,15 @@ If Safari on your iPhone can open your health check URL but the app still shows
 
 - **Home**: Context-aware recommendation feed with:
   - Urgency score and “Why now?” reason per item.
-  - Nearest Trader Joe’s name in the context bar and card footer (uses backend `location_service`).
+  - Nearest Trader Joe’s name, **address, and distance** in the context bar and card footer (device location + backend Overpass/location_service).
   - “Add to Inventory” (marks item as restocked in the DB) and “Dismiss” (hides locally).
-  - Product detail screen with urgency, reason, match score, nearby store, and similar products.
+  - Product detail screen with urgency, reason, match score, nearby store (name, address, distance), and similar products.
 - **Inventory**:
-  - List of items with stock bars and “last bought X days ago”.
+  - List of items with stock bars and “last bought X days ago”. **Stock decays over time** (demo: ~5% per interval, multiplicative; “days ago” increases by **1 per interval**—e.g. per second while recording, or per hour with `DECAY_INTERVAL_SECONDS = 3600` in `backend/recc/prototype.py`).
   - “Restock” button (sets stock to full and last_buy to 0 in the DB).
   - ➕ Add item (with initial stock level presets: Low/Medium/Full).
-  - Tap an item to edit stock and days since last purchase (so you can make items reappear on Home).
-- **Settings**: User profile, preferences, and notification toggles. “Low stock warnings” uses **local notifications** (no EAS or push token needed).
+  - Tap an item to edit stock and days since last purchase.
+- **Settings**: User profile, preferences, and **persistent** notification toggles (low-stock warnings, location-based alerts). “Low stock warnings” triggers **local notifications** when you open Home and have low-stock items (no EAS or push token).
 
 ---
 
@@ -189,6 +189,7 @@ If Safari on your iPhone can open your health check URL but the app still shows
 
 The app uses **local notifications** only: when you open **Home** and have items below the low-stock threshold (with “Low stock warnings” on in Settings), a notification is scheduled and appears a couple of seconds later. No server push, EAS project ID, or development build required.
 
+- **Foreground**: Notifications are shown even when the app is open (handler in `lib/pushNotifications.ts`).
 - Allow notifications when the app prompts you.
-- To test: set an item to low stock, then open the Home tab; you should see a “Low stock” notification shortly after.
-- Throttled to at most once per 4 hours so you’re not spammed if you open Home often.
+- **To test**: Set an item to low stock (e.g. in Inventory), then open the Home tab; you should see a “Low stock” notification shortly after.
+- Throttled to avoid spam (default 1 minute in code; can be increased to 4 hours for production).

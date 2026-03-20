@@ -175,10 +175,15 @@ def get_home_dashboard(
         stores = loc_service.get_nearby_businesses(lat, lon, radius=8000)
         if stores:
             nearest_store = stores[0]
+            sname = nearest_store.get("name") or "Store"
             dist = nearest_store.get("distance_mi")
-            context_str = f"Near {nearest_store['name']}" + (f" ({dist} mi)" if dist is not None else "")
+            if dist is not None:
+                context_str = f"Near {sname} • {float(dist):.1f} mi"
+            else:
+                context_str = f"Near {sname}"
         else:
             print("Home dashboard: no stores found for this location (Overpass may have returned empty or failed)")
+            context_str = "No Trader Joe's found nearby"
     else:
         print("Home dashboard: no lat/lon provided — request location permission on device and ensure API is called with ?lat=...&lon=...")
 

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   RefreshControl,
@@ -24,6 +24,7 @@ import {
 import { scheduleLowStockNotification } from '@/lib/pushNotifications';
 import * as Linking from 'expo-linking';
 import { useRouter } from 'expo-router';
+import { useFocusEffect } from '@react-navigation/native';
 
 export default function HomeScreen() {
   const colorScheme = useColorScheme();
@@ -35,6 +36,9 @@ export default function HomeScreen() {
   const [error, setError] = useState<string | null>(null);
   const [dismissedIds, setDismissedIds] = useState<Set<string>>(new Set());
   const [addingId, setAddingId] = useState<string | null>(null);
+  const coordsRef = useRef<{ lat?: number; lon?: number }>({});
+  /** Avoid poll overwriting UI before first load sets coords (fixes flash to "At home" + empty store). */
+  const homePollReadyRef = useRef(false);
 
   const load = async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
@@ -55,6 +59,8 @@ export default function HomeScreen() {
         // If location fails, we just fall back to non-contextual home dashboard.
       }
 
+      // Set before fetch so background poll uses same coords as the visible load.
+      coordsRef.current = { lat, lon };
       const res = await getHomeDashboard(lat, lon);
       setData(res);
       if (res.low_stock_items?.length) {
@@ -63,6 +69,7 @@ export default function HomeScreen() {
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load');
     } finally {
+      homePollReadyRef.current = true;
       setLoading(false);
       setRefreshing(false);
     }
@@ -87,6 +94,32 @@ export default function HomeScreen() {
   useEffect(() => {
     load();
   }, []);
+
+  // Poll home while focused so inventory decay / recommendations update without manual refresh.
+  useFocusEffect(
+    useCallback(() => {
+      let alive = true;
+      const tick = async () => {
+        if (!homePollReadyRef.current) return;
+        try {
+          const res = await getHomeDashboard(coordsRef.current.lat, coordsRef.current.lon);
+          if (!alive) return;
+          setData(res);
+          if (res.low_stock_items?.length) {
+            scheduleLowStockNotification(res.low_stock_items);
+          }
+        } catch {
+          // ignore transient errors during background poll
+        }
+      };
+      void tick();
+      const id = setInterval(tick, 1000);
+      return () => {
+        alive = false;
+        clearInterval(id);
+      };
+    }, [])
+  );
 
   if (loading && !data) {
     return (

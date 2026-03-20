@@ -28,7 +28,7 @@ export async function requestNotificationPermission(): Promise<boolean> {
   }
 }
 
-const LOW_STOCK_THROTTLE_MS = 60 * 1000; // 1 minute (increase to 4*60*60*1000 for production)
+const LOW_STOCK_THROTTLE_MS = 4* 60* 60 * 1000; // 1 minute (increase to 4*60*60*1000 for production)
 let lastLowStockNotifAt = 0;
 
 /**

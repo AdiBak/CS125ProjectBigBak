@@ -25,14 +25,15 @@ class SmartShoppingAssistant:
         if not self.df.empty:
             self.tfidf_matrix = self.tfidf.fit_transform(self.df["name"])
 
-    # Demo: 1 real hour = 1 "day"; stock decays 10% per hour.
-    DECAY_PER_HOUR = 0.9  # multiplier per hour
+    # Time-based decay: stock *= DECAY_FACTOR once per DECAY_INTERVAL_SECONDS since last_updated_utc.
+    # "Days ago" (last_buy) advances by one per elapsed interval so urgency reflects time since last update.
+    DECAY_FACTOR = 0.9
+    DECAY_INTERVAL_SECONDS = 3600  # 1 hour per step (~10% stock drop per hour with factor 0.9)
 
     def get_user_inventory(self, user_id: str) -> dict:
         """
-        Fetches the inventory for a specific user. Applies hourly decay: 1 real hour = 1 "day",
-        and stock decreases by 10% per hour from last_updated_utc so the demo can show
-        low-stock notifications without waiting real days.
+        Fetches the inventory for a specific user. Applies time-based decay from last_updated_utc
+        so the demo can show changing stock without waiting real days.
         """
         try:
             conn = sqlite3.connect(self.db_path)
@@ -52,17 +53,19 @@ class SmartShoppingAssistant:
                 last_buy = int(row["last_buy"])
                 last_utc = row.get("last_updated_utc")
                 if last_utc is None or (isinstance(last_utc, float) and (last_utc != last_utc)):
-                    # Demo-time mapping: "last_buy days" means last_buy real hours ago.
-                    last_utc = now - (last_buy * 3600) if last_buy else now
+                    # Legacy row: start decay clock from now so stored last_buy still displays.
+                    last_utc = now
                 last_utc = float(last_utc)
-                hours_since = max(0, (now - last_utc) / 3600)
-                # Effective stock after decay (10% per hour)
-                effective_stock = max(0.0, min(1.0, stock * (self.DECAY_PER_HOUR ** hours_since)))
-                # 1 real hour = 1 "day" for display and urgency.
-                effective_days_ago = hours_since
+                elapsed_sec = max(0.0, now - last_utc)
+                decay_intervals = elapsed_sec / self.DECAY_INTERVAL_SECONDS
+                effective_stock = max(
+                    0.0, min(1.0, stock * (self.DECAY_FACTOR ** decay_intervals))
+                )
+                # Days ago increases by 1 per decay interval (synced with each ~5% stock step).
+                effective_days_ago = int(round(last_buy + decay_intervals))
                 user_inventory[row["item_name"]] = {
                     "stock": effective_stock,
-                    "last_buy": int(round(effective_days_ago)),
+                    "last_buy": effective_days_ago,
                 }
             return user_inventory
 
@@ -124,16 +127,14 @@ class SmartShoppingAssistant:
         self, user_id: str, item_name: str, stock: float, last_buy: int
     ) -> bool:
         """
-        Sets an inventory item's stock (0.0-1.0) and last_buy (days ago).
-        In demo mode, 1 real hour = 1 day, so we persist last_updated_utc as
-        (now - last_buy hours) so the edited days value shows immediately.
+        Sets an inventory item's stock (0.0-1.0) and last_buy (baseline days ago at save).
+        last_updated_utc is set to now so decay and "days ago" advance together from this point.
         """
         try:
             conn = sqlite3.connect(self.db_path)
             cursor = conn.cursor()
             now = time.time()
-            # Demo-time mapping: last_buy "days" are represented as real hours.
-            last_updated_utc = now - (last_buy * 3600)
+            last_updated_utc = now
             cursor.execute(
                 "UPDATE inventory SET stock = ?, last_buy = ?, last_updated_utc = ? WHERE user_id = ? AND item_name = ?",
                 (stock, last_buy, last_updated_utc, user_id, item_name),

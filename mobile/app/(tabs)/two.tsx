@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -42,13 +42,23 @@ export default function InventoryScreen() {
     }
   };
 
-  useEffect(() => {
-    load();
-  }, []);
-
+  // Poll inventory while this tab is focused so server-side decay updates without pull-to-refresh.
   useFocusEffect(
     useCallback(() => {
-      load(true);
+      let alive = true;
+      void load(true);
+      const id = setInterval(async () => {
+        try {
+          const data = await getInventory();
+          if (alive) setItems(data);
+        } catch {
+          // ignore transient errors during background poll
+        }
+      }, 1000);
+      return () => {
+        alive = false;
+        clearInterval(id);
+      };
     }, [])
   );
 

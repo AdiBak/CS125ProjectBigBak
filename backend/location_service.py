@@ -4,7 +4,7 @@ import requests
 
 def _haversine_mi(lat1, lon1, lat2, lon2):
     """Return distance in miles between two (lat, lon) points."""
-    R = 3959  # Earth radius in miles
+    R = 3959  #f Earth radius in miles
     phi1, phi2 = math.radians(lat1), math.radians(lat2)
     dphi = math.radians(lat2 - lat1)
     dlam = math.radians(lon2 - lon1)
@@ -57,15 +57,16 @@ class BusinessLocationService:
             return self._parse_results(elements, lat, lon)
         except Exception as e:
             print(f"Overpass failed for lat={lat}, lon={lon}: {e}. Using mock location data.")
-            # Fallback mock store
+            mock_lat = lat + 0.005
+            mock_lon = lon + 0.005
             return [
                 {
-                    "name": "Trader Joe's (Mock)",
+                    "name": "Trader Joe's (offline fallback)",
                     "type": "supermarket",
-                    "lat": lat + 0.005,
-                    "lon": lon + 0.005,
-                    "address": "123 Mockingbird Lane, Irvine",
-                    "distance_mi": 0.3,
+                    "lat": mock_lat,
+                    "lon": mock_lon,
+                    "address": "Approximate — Overpass unavailable",
+                    "distance_mi": round(_haversine_mi(lat, lon, mock_lat, mock_lon), 1),
                     "osm_id": 999999999,
                 }
             ]
